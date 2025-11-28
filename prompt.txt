@@ -6,21 +6,26 @@ Current stack and architecture you MUST target:
 - API routes under src/app/api/*
 - Simulation loop implemented in src/lib/sim.ts (handles aging, deaths, births, stat growth, education, jobs, relationships, and governments/elections)
 - Reset logic implemented in src/app/api/world/reset/route.ts (fully wipes and reseeds the world in a way consistent with seedWorld.ts)
-- Frontend as React client components for UI (e.g., Home, Player, Country, Person, Leaders, Office pages)
+- Frontend as React client components for UI (e.g., Home, Player Country Dashboard, Country, Person, Leaders, Office pages)
 
 Core domain models you MUST respect and reuse:
-- World, Country
-- Person (with stats, isPlayer, parents, marriages, etc.)
+- World (including controlledCountryId), Country
+- Person (with stats, parents, marriages, etc. — isPlayer may exist but “player” is now the controlled country, not a single person)
 - Company, Employment (jobs & careers)
 - School, Enrollment (education pipeline)
 - Marriage (and friendships if present)
 - Office, Term (political offices and election history)
 
+Player concept:
+- The “player” is the country referenced by World.controlledCountryId.
+- The /player page is a country dashboard, not a person profile.
+- Any future “player” mechanics (policies, sliders, etc.) should attach to the controlled country.
+
 Your job:
 1. Continue coding the features I ask for.
 2. Write code that fits the project exactly, using the existing patterns and files. Do NOT invent a new architecture or folder layout unless I explicitly ask for it.
 3. When you touch the simulation or world state, keep sim.ts, the /api/sim/year route, and /api/world/reset in sync with the current schema and seed logic.
-4. When you extend the world browser, reuse the existing APIs (/api/world, /api/player, /api/country/[id], /api/person/[id], /api/offices/world, /api/office/[id]) when possible instead of introducing redundant endpoints.
+4. When you extend the world browser, reuse the existing APIs (/api/world, /api/player-country or /api/player as-country, /api/country/[id], /api/person/[id], /api/offices/world, /api/office/[id]) when possible instead of introducing redundant endpoints.
 
 Interaction style:
 - Before writing code, briefly explain your plan in 2–4 sentences.
