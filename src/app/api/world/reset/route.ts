@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { Person } from '@prisma/client';
+import { generateBaseStats } from '@/lib/stats'; // 👈 NEW
 
 // ----- CONFIG / HELPERS -----
 
@@ -57,7 +58,6 @@ function computeBaseSalary(person: Pick<Person, 'intelligence' | 'discipline' | 
 export async function POST() {
   try {
     // wipe old data in dependency-safe order
-    // (if you don't have Friendship/Marriage/Term yet, just delete those lines)
     await prisma.friendship?.deleteMany?.().catch(() => {});
     await prisma.marriage.deleteMany();
     await prisma.enrollment.deleteMany();
@@ -93,8 +93,8 @@ export async function POST() {
     const controlled = countries[0];
 
     await prisma.world.update({
-    where: { id: world.id },
-    data: { controlledCountryId: controlled.id },
+      where: { id: world.id },
+      data: { controlledCountryId: controlled.id },
     });
 
     // ----- PEOPLE -----
@@ -105,7 +105,7 @@ export async function POST() {
       const birthYear = randInt(-60, 0);
       const age = -birthYear;
 
-      const baseStat = () => randInt(20, 80);
+      const stats = generateBaseStats(); // 👈 new 24-stat profile
 
       return {
         worldId: world.id,
@@ -113,22 +113,16 @@ export async function POST() {
         name: randomName(),
         birthYear,
         age,
-        intelligence: baseStat(),
-        wit: baseStat(),
-        discipline: baseStat(),
-        charisma: baseStat(),
-        leadership: baseStat(),
-        empathy: baseStat(),
-        strength: baseStat(),
-        athleticism: baseStat(),
-        endurance: baseStat(),
         isPlayer: false,
+        ...stats,
       };
     });
 
     await prisma.person.createMany({ data: peopleData });
 
     // create player character
+    const playerStats = generateBaseStats();
+
     const player = await prisma.person.create({
       data: {
         worldId: world.id,
@@ -136,16 +130,8 @@ export async function POST() {
         name: 'Player One',
         birthYear: 0,
         age: 0,
-        intelligence: 60,
-        wit: 55,
-        discipline: 50,
-        charisma: 50,
-        leadership: 40,
-        empathy: 45,
-        strength: 50,
-        athleticism: 50,
-        endurance: 50,
         isPlayer: true,
+        ...playerStats, // 👈 make sure Player has all required stats too
       },
     });
 

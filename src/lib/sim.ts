@@ -1,8 +1,10 @@
+// src/lib/sim.ts
 import { prisma } from './prisma';
+import { STAT_KEYS } from './stats';
 
 // --- random name helpers for births ---
 const FIRST = ['Lena', 'Kai', 'Mara', 'Jace', 'Noa', 'Theo', 'Iris', 'Ravi'];
-const LAST  = ['Halden', 'Kerr', 'Novak', 'Saeed', 'Kato', 'Silva', 'Ibrahim'];
+const LAST = ['Halden', 'Kerr', 'Novak', 'Saeed', 'Kato', 'Silva', 'Ibrahim'];
 
 function randInt(min: number, max: number) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -10,7 +12,7 @@ function randInt(min: number, max: number) {
 
 function randomName() {
   const first = FIRST[randInt(0, FIRST.length - 1)];
-  const last  = LAST[randInt(0, LAST.length - 1)];
+  const last = LAST[randInt(0, LAST.length - 1)];
   return `${first} ${last}`;
 }
 
@@ -95,31 +97,30 @@ export async function tickYear(worldId: number) {
 
     // start from existing stats
     let intelligence = p.intelligence;
-    let wit          = p.wit;
-    let discipline   = p.discipline;
-    let strength     = p.strength;
-    let athleticism  = p.athleticism;
-    let endurance    = p.endurance;
-    let prestige     = p.prestige;
+    let discipline = p.discipline;
+    let strength = p.strength;
+    let endurance = p.endurance;
+    let athleticism = p.athleticism;
+    let charisma = p.charisma;
+    let leadership = p.leadership;
+    let prestige = p.prestige;
 
-    // stat growth for kids/teens
+    // stat growth for kids/teens (for now: a subset of stats)
     if (newAge < 18 && !died) {
       const r = (min: number, max: number) => randInt(min, max);
 
       intelligence += r(-1, 2);
-      wit          += r(-1, 2);
-      discipline   += r(-1, 2);
+      discipline += r(-1, 2);
 
-      strength     += r(-1, 3);
-      athleticism  += r(-1, 3);
-      endurance    += r(-1, 3);
+      strength += r(-1, 3);
+      endurance += r(-1, 3);
+      athleticism += r(-1, 3);
 
       intelligence = clampStat(intelligence);
-      wit          = clampStat(wit);
-      discipline   = clampStat(discipline);
-      strength     = clampStat(strength);
-      athleticism  = clampStat(athleticism);
-      endurance    = clampStat(endurance);
+      discipline = clampStat(discipline);
+      strength = clampStat(strength);
+      endurance = clampStat(endurance);
+      athleticism = clampStat(athleticism);
     }
 
     return {
@@ -127,11 +128,12 @@ export async function tickYear(worldId: number) {
       age: newAge,
       isAlive: !died,
       intelligence,
-      wit,
       discipline,
       strength,
-      athleticism,
       endurance,
+      athleticism,
+      charisma,
+      leadership,
       prestige,
     };
   });
@@ -156,7 +158,7 @@ export async function tickYear(worldId: number) {
     spouseMap.set(m.personBId, bList);
   }
 
-  // ---------- BIRTHS (PREFER TWO-PARENT, SPOUSE FIRST) ----------
+  // ---------- BIRTHS (inherit every stat from parents) ----------
   const fertile = world.people.filter((p) => p.age >= 20 && p.age <= 40);
   const births: any[] = [];
 
@@ -195,46 +197,26 @@ export async function tickYear(worldId: number) {
 
       const babyName = randomName();
 
+      // Build full stat profile for baby from both parents for all STAT_KEYS
+      const babyStats: Record<string, number> = {};
+      for (const key of STAT_KEYS) {
+        const p1Val = (parent1 as any)[key] as number | undefined;
+        const p2Val = parent2 ? ((parent2 as any)[key] as number | undefined) : undefined;
+        const v = statFromParents(p1Val ?? 50, p2Val ?? null);
+        babyStats[key] = v;
+      }
+
       births.push({
         worldId,
         countryId: parent1.countryId,
         name: babyName,
         birthYear: newYear,
         age: 0,
-        intelligence: statFromParents(
-          parent1.intelligence,
-          parent2?.intelligence ?? null,
-        ),
-        wit: statFromParents(parent1.wit, parent2?.wit ?? null),
-        discipline: statFromParents(
-          parent1.discipline,
-          parent2?.discipline ?? null,
-        ),
-        charisma: statFromParents(
-          parent1.charisma,
-          parent2?.charisma ?? null,
-        ),
-        leadership: statFromParents(
-          parent1.leadership,
-          parent2?.leadership ?? null,
-        ),
-        empathy: statFromParents(parent1.empathy, parent2?.empathy ?? null),
-        strength: statFromParents(
-          parent1.strength,
-          parent2?.strength ?? null,
-        ),
-        athleticism: statFromParents(
-          parent1.athleticism,
-          parent2?.athleticism ?? null,
-        ),
-        endurance: statFromParents(
-          parent1.endurance,
-          parent2?.endurance ?? null,
-        ),
         isAlive: true,
         isPlayer: false,
         parent1Id: parent1.id,
         parent2Id: parent2 ? parent2.id : null,
+        ...babyStats,
       });
     }
   }
@@ -427,7 +409,7 @@ export async function tickYear(worldId: number) {
     const scored = candidates.map((p) => {
       const upd = updatedById.get(p.id)!;
       const charisma = upd.charisma;
-      const leadership = p.leadership;
+      const leadership = upd.leadership;
       const prestige = upd.prestige ?? 0;
 
       const score =
@@ -476,7 +458,7 @@ export async function tickYear(worldId: number) {
     const updWinner = updatedById.get(winner.id);
     if (updWinner) {
       updWinner.charisma = clampStat(updWinner.charisma + 1);
-      updWinner.leadership = clampStat(winner.leadership + 2);
+      updWinner.leadership = clampStat(updWinner.leadership + 2);
       updWinner.prestige = clampPrestige(
         (updWinner.prestige ?? 0) + office.prestige / 5,
       );
@@ -525,7 +507,7 @@ export async function tickYear(worldId: number) {
       continue;
     }
 
-    // EDUCATION progression (unchanged from your logic)
+    // EDUCATION progression (same as before)
     let stillEnrolled = currentEnrollment;
 
     if (currentEnrollment) {
@@ -631,7 +613,7 @@ export async function tickYear(worldId: number) {
       }
     }
 
-    // JOB SYSTEM (same as before, with prestige already baked into updates)
+    // JOB SYSTEM
     const job = currentJob;
 
     if (age > 75 && job) {
@@ -655,7 +637,7 @@ export async function tickYear(worldId: number) {
         continue;
       }
 
-      const promoFactor = (upd.discipline + person.leadership) / 160;
+      const promoFactor = (upd.discipline + upd.leadership) / 160;
       if (Math.random() < 0.05 * promoFactor) {
         const newTitle = nextJobTitle(job.title);
         const newSalary = Math.round(job.salary * (1.1 + Math.random() * 0.05));
@@ -698,7 +680,7 @@ export async function tickYear(worldId: number) {
     if (!countryCompanies || countryCompanies.length === 0) continue;
 
     const skill =
-      (upd.intelligence + upd.discipline + person.charisma) / 3;
+      (upd.intelligence + upd.discipline + upd.charisma) / 3;
 
     const eduBoost = hasCompletedUniversity ? 0.1 : 0;
     const baseHireChance = 0.05 + (skill - 20) * (0.25 / 60) + eduBoost;
@@ -710,7 +692,7 @@ export async function tickYear(worldId: number) {
       const salary = computeBaseSalary({
         intelligence: upd.intelligence,
         discipline: upd.discipline,
-        charisma: person.charisma,
+        charisma: upd.charisma,
       });
 
       jobTxs.push(
@@ -741,19 +723,21 @@ export async function tickYear(worldId: number) {
           age: u.age,
           isAlive: u.isAlive,
           intelligence: u.intelligence,
-          wit: u.wit,
           discipline: u.discipline,
           strength: u.strength,
-          athleticism: u.athleticism,
           endurance: u.endurance,
+          athleticism: u.athleticism,
+          charisma: u.charisma,
+          leadership: u.leadership,
           prestige: u.prestige,
         },
       }),
     ),
 
-    births.length
-      ? prisma.person.createMany({ data: births })
-      : prisma.$executeRaw`SELECT 1`,
+    // Only add a createMany if there are births; otherwise, nothing
+    ...(births.length
+      ? [prisma.person.createMany({ data: births })]
+      : []),
 
     ...eduTxs,
     ...marriageTxs,

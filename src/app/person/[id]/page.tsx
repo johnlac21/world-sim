@@ -4,16 +4,39 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 
+// === NEW STAT BLOCK ===
 type StatBlock = {
+  // Cognitive
   intelligence: number;
-  wit: number;
+  memory: number;
+  creativity: number;
   discipline: number;
+  judgment: number;
+  adaptability: number;
+
+  // Social / Influence
   charisma: number;
   leadership: number;
   empathy: number;
+  communication: number;
+  confidence: number;
+  negotiation: number;
+
+  // Physical
   strength: number;
-  athleticism: number;
   endurance: number;
+  athleticism: number;
+  vitality: number;
+  reflexes: number;
+  appearance: number;
+
+  // Personality
+  ambition: number;
+  integrity: number;
+  riskTaking: number;
+  patience: number;
+  agreeableness: number;
+  stability: number;
 };
 
 type Job = {
@@ -65,6 +88,45 @@ type PersonPayload = {
   } | null;
   pastEnrollments: Enrollment[];
   spouses: Spouse[];
+};
+
+// layout for grouped rendering
+const STAT_LAYOUT: Record<
+  string,
+  { key: keyof StatBlock; label: string }[]
+> = {
+  Cognitive: [
+    { key: 'intelligence', label: 'Intelligence' },
+    { key: 'memory', label: 'Memory' },
+    { key: 'creativity', label: 'Creativity' },
+    { key: 'discipline', label: 'Discipline' },
+    { key: 'judgment', label: 'Judgment' },
+    { key: 'adaptability', label: 'Adaptability' },
+  ],
+  'Social / Influence': [
+    { key: 'charisma', label: 'Charisma' },
+    { key: 'leadership', label: 'Leadership' },
+    { key: 'empathy', label: 'Empathy' },
+    { key: 'communication', label: 'Communication' },
+    { key: 'confidence', label: 'Confidence' },
+    { key: 'negotiation', label: 'Negotiation' },
+  ],
+  Physical: [
+    { key: 'strength', label: 'Strength' },
+    { key: 'endurance', label: 'Endurance' },
+    { key: 'athleticism', label: 'Athleticism' },
+    { key: 'vitality', label: 'Vitality' },
+    { key: 'reflexes', label: 'Reflexes' },
+    { key: 'appearance', label: 'Appearance' },
+  ],
+  Personality: [
+    { key: 'ambition', label: 'Ambition' },
+    { key: 'integrity', label: 'Integrity' },
+    { key: 'riskTaking', label: 'Risk taking' },
+    { key: 'patience', label: 'Patience' },
+    { key: 'agreeableness', label: 'Agreeableness' },
+    { key: 'stability', label: 'Emotional stability' },
+  ],
 };
 
 export default function PersonPage() {
@@ -131,21 +193,27 @@ export default function PersonPage() {
         <p className="text-sm text-gray-600">Born in year {data.birthYear}</p>
       </header>
 
+      {/* ===== Attributes ===== */}
       <section>
         <h2 className="text-xl font-semibold mb-2">Attributes</h2>
-        <ul className="list-disc ml-6 text-sm">
-          <li>Intelligence: {stats.intelligence}</li>
-          <li>Wit: {stats.wit}</li>
-          <li>Discipline: {stats.discipline}</li>
-          <li>Charisma: {stats.charisma}</li>
-          <li>Leadership: {stats.leadership}</li>
-          <li>Empathy: {stats.empathy}</li>
-          <li>Strength: {stats.strength}</li>
-          <li>Athleticism: {stats.athleticism}</li>
-          <li>Endurance: {stats.endurance}</li>
-        </ul>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          {Object.entries(STAT_LAYOUT).map(([groupName, groupStats]) => (
+            <div key={groupName}>
+              <h3 className="font-semibold text-sm mb-1">{groupName}</h3>
+              <ul className="list-disc ml-6 text-sm">
+                {groupStats.map(({ key, label }) => (
+                  <li key={key}>
+                    {label}: {stats[key]}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
       </section>
 
+      {/* ===== Career ===== */}
       <section>
         <h2 className="text-xl font-semibold mb-2">Career</h2>
         {data.currentJob ? (
@@ -173,6 +241,7 @@ export default function PersonPage() {
         )}
       </section>
 
+      {/* ===== Education ===== */}
       <section>
         <h2 className="text-xl font-semibold mb-2">Education</h2>
         {data.currentEnrollment ? (
@@ -199,6 +268,7 @@ export default function PersonPage() {
         )}
       </section>
 
+      {/* ===== Relationships ===== */}
       <section>
         <h2 className="text-xl font-semibold mb-2">Relationships</h2>
         {data.spouses.length === 0 ? (

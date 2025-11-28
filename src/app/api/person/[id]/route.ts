@@ -37,7 +37,6 @@ export async function GET(
     return NextResponse.json({ error: 'Person not found' }, { status: 404 });
   }
 
-  // Merge marriages where this person is A or B
   const spouses = [
     ...person.marriagesA.map((m) => ({
       marriageId: m.id,
@@ -72,25 +71,48 @@ export async function GET(
     isAlive: person.isAlive,
     isPlayer: person.isPlayer,
 
+    // 🔥 NEW: full 24-stat block
     stats: {
+      // Cognitive
       intelligence: person.intelligence,
-      wit: person.wit,
+      memory: person.memory,
+      creativity: person.creativity,
       discipline: person.discipline,
+      judgment: person.judgment,
+      adaptability: person.adaptability,
+
+      // Social / Influence
       charisma: person.charisma,
       leadership: person.leadership,
       empathy: person.empathy,
+      communication: person.communication,
+      confidence: person.confidence,
+      negotiation: person.negotiation,
+
+      // Physical
       strength: person.strength,
-      athleticism: person.athleticism,
       endurance: person.endurance,
+      athleticism: person.athleticism,
+      vitality: person.vitality,
+      reflexes: person.reflexes,
+      appearance: person.appearance,
+
+      // Personality
+      ambition: person.ambition,
+      integrity: person.integrity,
+      riskTaking: person.riskTaking,
+      patience: person.patience,
+      agreeableness: person.agreeableness,
+      stability: person.stability,
     },
 
     currentJob: currentJob
       ? {
-        title: currentJob.title,
-        companyId: currentJob.companyId,
-        salary: currentJob.salary,
-        startYear: currentJob.startYear,
-      }
+          title: currentJob.title,
+          companyId: currentJob.companyId,
+          salary: currentJob.salary,
+          startYear: currentJob.startYear,
+        }
       : null,
     pastJobs: pastJobs.map((j) => ({
       id: j.id,
@@ -103,10 +125,10 @@ export async function GET(
 
     currentEnrollment: currentEnrollment
       ? {
-        schoolName: currentEnrollment.school.name,
-        level: currentEnrollment.school.level,
-        startYear: currentEnrollment.startYear,
-      }
+          schoolName: currentEnrollment.school.name,
+          level: currentEnrollment.school.level,
+          startYear: currentEnrollment.startYear,
+        }
       : null,
     pastEnrollments: pastEnrollments.map((e) => ({
       id: e.id,

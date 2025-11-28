@@ -1,5 +1,6 @@
 // scripts/seedWorld.ts
 import { PrismaClient, Person } from '@prisma/client';
+import { generateBaseStats } from '../src/lib/stats';
 
 const prisma = new PrismaClient();
 
@@ -90,8 +91,7 @@ async function main() {
     ),
   );
 
-
-  // NEW — set which country the user controls
+  // Set which country the user controls
   await prisma.world.update({
     where: { id: world.id },
     data: {
@@ -106,7 +106,7 @@ async function main() {
     const birthYear = randInt(-60, 0);
     const age = -birthYear;
 
-    const baseStat = () => randInt(20, 80);
+    const stats = generateBaseStats();
 
     return {
       worldId: world.id,
@@ -114,41 +114,13 @@ async function main() {
       name: randomName(),
       birthYear,
       age,
-      intelligence: baseStat(),
-      wit: baseStat(),
-      discipline: baseStat(),
-      charisma: baseStat(),
-      leadership: baseStat(),
-      empathy: baseStat(),
-      strength: baseStat(),
-      athleticism: baseStat(),
-      endurance: baseStat(),
       isPlayer: false,
+      // spread new stat profile
+      ...stats,
     };
   });
 
   await prisma.person.createMany({ data: peopleData });
-
-  // // create player character
-  // await prisma.person.create({
-  //   data: {
-  //     worldId: world.id,
-  //     countryId: countries[0].id,
-  //     name: 'Player One',
-  //     birthYear: 0,
-  //     age: 0,
-  //     intelligence: 60,
-  //     wit: 55,
-  //     discipline: 50,
-  //     charisma: 50,
-  //     leadership: 40,
-  //     empathy: 45,
-  //     strength: 50,
-  //     athleticism: 50,
-  //     endurance: 50,
-  //     isPlayer: true,
-  //   },
-  // });
 
   // ===== SCHOOLS (EDUCATION) =====
   const schools = await prisma.$transaction(
@@ -230,7 +202,6 @@ async function main() {
       }),
     ),
   );
-
 
   const companiesByCountry = new Map<number, typeof companies>();
   for (const country of countries) {
@@ -401,9 +372,7 @@ async function main() {
   ]);
 
   console.log(
-    `Seeded world ${world.id} with ${countries.length} countries, ${
-      peopleToCreate + 1
-    } people (incl. player), ${companies.length} companies, ${schools.length} schools, ${employmentCreates.length} jobs, ${enrollmentCreates.length} enrollments, ${marriageCreates.length} marriages, ${friendshipCreates.length} friendships.`,
+    `Seeded world ${world.id} with ${countries.length} countries, ${peopleToCreate} people, ${companies.length} companies, ${schools.length} schools, ${employmentCreates.length} jobs, ${enrollmentCreates.length} enrollments, ${marriageCreates.length} marriages, ${friendshipCreates.length} friendships.`,
   );
 }
 

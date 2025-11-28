@@ -56,17 +56,45 @@ model Person {
   birthYear Int
   age       Int
 
+  // =========================
+  // Cognitive stats
+  // =========================
   intelligence Int
-  wit          Int
+  memory       Int
+  creativity   Int
   discipline   Int
+  judgment     Int
+  adaptability Int
 
-  charisma   Int
-  leadership Int
-  empathy    Int
+  // =========================
+  // Social / Influence stats
+  // =========================
+  charisma      Int
+  leadership    Int
+  empathy       Int
+  communication Int
+  confidence    Int
+  negotiation   Int
 
+  // =========================
+  // Physical stats
+  // =========================
   strength    Int
-  athleticism Int
   endurance   Int
+  athleticism Int
+  vitality    Int
+  reflexes    Int
+  appearance  Int
+
+  // =========================
+  // Personality stats
+  // =========================
+  ambition     Int
+  integrity    Int
+  riskTaking   Int
+  patience     Int
+  agreeableness Int
+  stability     Int
 
   isAlive  Boolean @default(true)
   isPlayer Boolean @default(false)
