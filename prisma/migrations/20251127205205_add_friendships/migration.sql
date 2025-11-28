@@ -1,0 +1,10 @@
+-- CreateTable
+CREATE TABLE "Friendship" (
+    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "personAId" INTEGER NOT NULL,
+    "personBId" INTEGER NOT NULL,
+    "strength" INTEGER NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "Friendship_personAId_fkey" FOREIGN KEY ("personAId") REFERENCES "Person" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "Friendship_personBId_fkey" FOREIGN KEY ("personBId") REFERENCES "Person" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);

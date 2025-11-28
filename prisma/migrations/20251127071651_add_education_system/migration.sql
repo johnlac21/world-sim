@@ -1,0 +1,24 @@
+-- CreateTable
+CREATE TABLE "School" (
+    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "name" TEXT NOT NULL,
+    "level" TEXT NOT NULL,
+    "prestige" INTEGER NOT NULL,
+    "worldId" INTEGER NOT NULL,
+    "countryId" INTEGER NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "School_worldId_fkey" FOREIGN KEY ("worldId") REFERENCES "World" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "School_countryId_fkey" FOREIGN KEY ("countryId") REFERENCES "Country" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "Enrollment" (
+    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "personId" INTEGER NOT NULL,
+    "schoolId" INTEGER NOT NULL,
+    "startYear" INTEGER NOT NULL,
+    "endYear" INTEGER,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "Enrollment_personId_fkey" FOREIGN KEY ("personId") REFERENCES "Person" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "Enrollment_schoolId_fkey" FOREIGN KEY ("schoolId") REFERENCES "School" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
