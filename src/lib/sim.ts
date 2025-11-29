@@ -1,6 +1,15 @@
 // src/lib/sim.ts
+import type { Person } from '@prisma/client';
 import { prisma } from './prisma';
-import { STAT_KEYS } from './stats';
+import {
+  STAT_KEYS,
+  type PersonStats,
+  computeOverallRating,
+  generatePotentialOverall,
+  generateDevelopmentStyle,
+  generatePeakAge,
+  type DevStyle,
+} from './stats';
 
 // --- random name helpers for births ---
 const FIRST = ['Lena', 'Kai', 'Mara', 'Jace', 'Noa', 'Theo', 'Iris', 'Ravi'];
@@ -54,11 +63,22 @@ function nextJobTitle(current: string): string {
 }
 
 function clampStat(v: number) {
-  return Math.max(1, Math.min(99, v));
+  return Math.max(1, Math.min(99, Math.round(v)));
 }
 
 function clampPrestige(v: number) {
   return Math.max(0, Math.min(100, Math.round(v)));
+}
+
+// simple normal noise generator for dev
+function normalNoise(sd: number): number {
+  if (sd <= 0) return 0;
+  let u = 0,
+    v = 0;
+  while (u === 0) u = Math.random();
+  while (v === 0) v = Math.random();
+  const z = Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+  return z * sd;
 }
 
 // Salary based on mental/social stats
@@ -70,6 +90,101 @@ function computeBaseSalary(person: {
   const skill = (person.intelligence + person.discipline + person.charisma) / 3; // ~20–80
   // Map ~20–80 → ~25k–150k
   return Math.round(25000 + (skill - 20) * (125000 / 60));
+}
+
+/**
+ * Apply one year of BBGM-style development to a person's stats.
+ * Uses potentialOverall, peakAge, developmentStyle, and per-stat peak tweaks.
+ */
+function applyYearlyDevelopment(person: Person, newAge: number): PersonStats {
+  const currentStats: PersonStats = {} as PersonStats;
+  for (const key of STAT_KEYS) {
+    // @ts-expect-error dynamic access from Prisma model
+    currentStats[key] = person[key];
+  }
+
+  const currentOverall = computeOverallRating(currentStats);
+  const { potentialOverall, peakAge, developmentStyle } = person;
+
+  // how far from overall peak
+  const yearsToPeak = peakAge - newAge;
+  const growthDirection = yearsToPeak > 0 ? 1 : -1; // pre-peak vs post-peak
+  const distance = Math.abs(yearsToPeak);
+
+  let baseGrowth = 0.0;
+  if (distance > 15) baseGrowth = 0.3;
+  else if (distance > 8) baseGrowth = 0.7;
+  else if (distance > 3) baseGrowth = 1.2;
+  else baseGrowth = 1.8; // very near peak: strong movement
+
+  let styleMultiplier = 1.0;
+  let volatility = 0.4;
+  switch (developmentStyle as DevStyle) {
+    case 'EARLY':
+      styleMultiplier = newAge < peakAge ? 1.3 : 0.7;
+      volatility = 0.5;
+      break;
+    case 'NORMAL':
+      styleMultiplier = 1.0;
+      volatility = 0.4;
+      break;
+    case 'LATE':
+      styleMultiplier = newAge < peakAge ? 0.8 : 1.2;
+      volatility = 0.4;
+      break;
+    case 'VOLATILE':
+      styleMultiplier = 1.0;
+      volatility = 1.2;
+      break;
+  }
+
+  const signedGrowth = baseGrowth * styleMultiplier * growthDirection;
+
+  const nextStats: PersonStats = {} as PersonStats;
+
+  for (const key of STAT_KEYS) {
+    const current = currentStats[key];
+
+    // tweak per-stat peak ages: physical earlier, cognitive later
+    let statPeakAge = peakAge;
+    if (
+      key === 'strength' ||
+      key === 'endurance' ||
+      key === 'athleticism' ||
+      key === 'reflexes' ||
+      key === 'appearance'
+    ) {
+      statPeakAge = peakAge - 5;
+    } else if (
+      key === 'intelligence' ||
+      key === 'judgment' ||
+      key === 'memory'
+    ) {
+      statPeakAge = peakAge + 5;
+    }
+
+    const statYearsToPeak = statPeakAge - newAge;
+    const statGrowthDir = statYearsToPeak > 0 ? 1 : -1;
+
+    const diffOverall = potentialOverall - currentOverall;
+    const statTarget = current + diffOverall * 0.4; // soft pull toward potential
+
+    const towardTarget = statTarget - current;
+    const stepMagnitude = Math.min(
+      Math.abs(towardTarget) * 0.25,
+      Math.abs(signedGrowth) + 0.5,
+    );
+
+    const deterministicDelta = stepMagnitude * statGrowthDir;
+    const noise = normalNoise(volatility);
+
+    let next = current + deterministicDelta + noise;
+    next = clampStat(next);
+
+    nextStats[key] = next;
+  }
+
+  return nextStats;
 }
 
 export async function tickYear(worldId: number) {
@@ -90,51 +205,31 @@ export async function tickYear(worldId: number) {
   const personById = new Map<number, (typeof world.people)[number]>();
   for (const p of world.people) personById.set(p.id, p);
 
-  // ---------- AGE + DEATH + STAT GROWTH ----------
+  // ---------- AGE + DEATH + STATS (BBGM-style dev) ----------
   const updates = world.people.map((p) => {
     const newAge = p.age + 1;
     const died = Math.random() < deathProbability(newAge);
 
-    // start from existing stats
-    let intelligence = p.intelligence;
-    let discipline = p.discipline;
-    let strength = p.strength;
-    let endurance = p.endurance;
-    let athleticism = p.athleticism;
-    let charisma = p.charisma;
-    let leadership = p.leadership;
-    let prestige = p.prestige;
-
-    // stat growth for kids/teens (for now: a subset of stats)
-    if (newAge < 18 && !died) {
-      const r = (min: number, max: number) => randInt(min, max);
-
-      intelligence += r(-1, 2);
-      discipline += r(-1, 2);
-
-      strength += r(-1, 3);
-      endurance += r(-1, 3);
-      athleticism += r(-1, 3);
-
-      intelligence = clampStat(intelligence);
-      discipline = clampStat(discipline);
-      strength = clampStat(strength);
-      endurance = clampStat(endurance);
-      athleticism = clampStat(athleticism);
+    // start with current stats
+    let newStats: PersonStats = {} as PersonStats;
+    for (const key of STAT_KEYS) {
+      // @ts-expect-error dynamic
+      newStats[key] = p[key];
     }
+
+    if (!died && newAge >= 5 && newAge <= 80) {
+      // apply dev only for reasonable ages
+      newStats = applyYearlyDevelopment(p, newAge);
+    }
+
+    const prestige = p.prestige;
 
     return {
       id: p.id,
       age: newAge,
       isAlive: !died,
-      intelligence,
-      discipline,
-      strength,
-      endurance,
-      athleticism,
-      charisma,
-      leadership,
       prestige,
+      ...newStats,
     };
   });
 
@@ -158,7 +253,7 @@ export async function tickYear(worldId: number) {
     spouseMap.set(m.personBId, bList);
   }
 
-  // ---------- BIRTHS (inherit every stat from parents) ----------
+  // ---------- BIRTHS (inherit stats from parents + new potential/dev) ----------
   const fertile = world.people.filter((p) => p.age >= 20 && p.age <= 40);
   const births: any[] = [];
 
@@ -196,15 +291,46 @@ export async function tickYear(worldId: number) {
       }
 
       const babyName = randomName();
+      const p2 = parent2;
 
-      // Build full stat profile for baby from both parents for all STAT_KEYS
-      const babyStats: Record<string, number> = {};
-      for (const key of STAT_KEYS) {
-        const p1Val = (parent1 as any)[key] as number | undefined;
-        const p2Val = parent2 ? ((parent2 as any)[key] as number | undefined) : undefined;
-        const v = statFromParents(p1Val ?? 50, p2Val ?? null);
-        babyStats[key] = v;
-      }
+      const babyStats: PersonStats = {
+        // Cognitive
+        intelligence: statFromParents(parent1.intelligence, p2 ? p2.intelligence : null),
+        memory:       statFromParents(parent1.memory,       p2 ? p2.memory       : null),
+        creativity:   statFromParents(parent1.creativity,   p2 ? p2.creativity   : null),
+        discipline:   statFromParents(parent1.discipline,   p2 ? p2.discipline   : null),
+        judgment:     statFromParents(parent1.judgment,     p2 ? p2.judgment     : null),
+        adaptability: statFromParents(parent1.adaptability, p2 ? p2.adaptability : null),
+
+        // Social / Influence
+        charisma:      statFromParents(parent1.charisma,      p2 ? p2.charisma      : null),
+        leadership:    statFromParents(parent1.leadership,    p2 ? p2.leadership    : null),
+        empathy:       statFromParents(parent1.empathy,       p2 ? p2.empathy       : null),
+        communication: statFromParents(parent1.communication, p2 ? p2.communication : null),
+        confidence:    statFromParents(parent1.confidence,    p2 ? p2.confidence    : null),
+        negotiation:   statFromParents(parent1.negotiation,   p2 ? p2.negotiation   : null),
+
+        // Physical
+        strength:    statFromParents(parent1.strength,    p2 ? p2.strength    : null),
+        endurance:   statFromParents(parent1.endurance,   p2 ? p2.endurance   : null),
+        athleticism: statFromParents(parent1.athleticism, p2 ? p2.athleticism : null),
+        vitality:    statFromParents(parent1.vitality,    p2 ? p2.vitality    : null),
+        reflexes:    statFromParents(parent1.reflexes,    p2 ? p2.reflexes    : null),
+        appearance:  statFromParents(parent1.appearance,  p2 ? p2.appearance  : null),
+
+        // Personality
+        ambition:      statFromParents(parent1.ambition,      p2 ? p2.ambition      : null),
+        integrity:     statFromParents(parent1.integrity,     p2 ? p2.integrity     : null),
+        riskTaking:    statFromParents(parent1.riskTaking,    p2 ? p2.riskTaking    : null),
+        patience:      statFromParents(parent1.patience,      p2 ? p2.patience      : null),
+        agreeableness: statFromParents(parent1.agreeableness, p2 ? p2.agreeableness : null),
+        stability:     statFromParents(parent1.stability,     p2 ? p2.stability     : null),
+      };
+
+      const babyOverall   = computeOverallRating(babyStats);
+      const babyDevStyle  = generateDevelopmentStyle();
+      const babyPeakAge   = generatePeakAge(babyDevStyle);
+      const babyPotential = generatePotentialOverall(babyOverall);
 
       births.push({
         worldId,
@@ -216,6 +342,9 @@ export async function tickYear(worldId: number) {
         isPlayer: false,
         parent1Id: parent1.id,
         parent2Id: parent2 ? parent2.id : null,
+        potentialOverall: babyPotential,
+        peakAge: babyPeakAge,
+        developmentStyle: babyDevStyle, // <-- plain string now
         ...babyStats,
       });
     }
@@ -454,7 +583,7 @@ export async function tickYear(worldId: number) {
       }),
     );
 
-    // prestige + stat bump for winner
+    // prestige + stat bump for winner (mutate updatedById entry)
     const updWinner = updatedById.get(winner.id);
     if (updWinner) {
       updWinner.charisma = clampStat(updWinner.charisma + 1);
@@ -716,28 +845,60 @@ export async function tickYear(worldId: number) {
       data: { currentYear: newYear },
     }),
 
+    // Update every person explicitly with all stats
     ...updates.map((u) =>
       prisma.person.update({
         where: { id: u.id },
         data: {
           age: u.age,
           isAlive: u.isAlive,
+          prestige: u.prestige,
+
+          // =========================
+          // Cognitive
+          // =========================
           intelligence: u.intelligence,
+          memory: u.memory,
+          creativity: u.creativity,
           discipline: u.discipline,
+          judgment: u.judgment,
+          adaptability: u.adaptability,
+
+          // =========================
+          // Social / Influence
+          // =========================
+          charisma: u.charisma,
+          leadership: u.leadership,
+          empathy: u.empathy,
+          communication: u.communication,
+          confidence: u.confidence,
+          negotiation: u.negotiation,
+
+          // =========================
+          // Physical
+          // =========================
           strength: u.strength,
           endurance: u.endurance,
           athleticism: u.athleticism,
-          charisma: u.charisma,
-          leadership: u.leadership,
-          prestige: u.prestige,
+          vitality: u.vitality,
+          reflexes: u.reflexes,
+          appearance: u.appearance,
+
+          // =========================
+          // Personality
+          // =========================
+          ambition: u.ambition,
+          integrity: u.integrity,
+          riskTaking: u.riskTaking,
+          patience: u.patience,
+          agreeableness: u.agreeableness,
+          stability: u.stability,
         },
       }),
     ),
 
-    // Only add a createMany if there are births; otherwise, nothing
-    ...(births.length
-      ? [prisma.person.createMany({ data: births })]
-      : []),
+    // Only add a createMany if there are births
+    ...(births.length ? [prisma.person.createMany({ data: births })] : []),
 
     ...eduTxs,
     ...marriageTxs,

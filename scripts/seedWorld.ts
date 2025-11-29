@@ -1,6 +1,12 @@
 // scripts/seedWorld.ts
-import { PrismaClient, Person } from '@prisma/client';
-import { generateBaseStats } from '../src/lib/stats';
+import { PrismaClient, Person, DevelopmentStyle } from '@prisma/client';
+import {
+  generateBaseStats,
+  computeOverallRating,
+  generatePotentialOverall,
+  generateDevelopmentStyle,
+  generatePeakAge,
+} from '../src/lib/stats';
 
 const prisma = new PrismaClient();
 
@@ -107,6 +113,9 @@ async function main() {
     const age = -birthYear;
 
     const stats = generateBaseStats();
+    const overall = computeOverallRating(stats);
+    const devStyle = generateDevelopmentStyle();
+    const peakAge = generatePeakAge(devStyle);
 
     return {
       worldId: world.id,
@@ -115,6 +124,10 @@ async function main() {
       birthYear,
       age,
       isPlayer: false,
+      // potential & development
+      potentialOverall: generatePotentialOverall(overall),
+      peakAge,
+      developmentStyle: devStyle as DevelopmentStyle,
       // spread new stat profile
       ...stats,
     };

@@ -89,12 +89,20 @@ model Person {
   // =========================
   // Personality stats
   // =========================
-  ambition     Int
-  integrity    Int
-  riskTaking   Int
-  patience     Int
+  ambition      Int
+  integrity     Int
+  riskTaking    Int
+  patience      Int
   agreeableness Int
   stability     Int
+
+  // =========================
+  // Potential & development
+  // =========================
+  potentialOverall Int    @default(60)
+  peakAge          Int    @default(35)
+  developmentStyle String @default("NORMAL")
+
 
   isAlive  Boolean @default(true)
   isPlayer Boolean @default(false)
