@@ -47,3 +47,5 @@ node_modules/
 dev.db
 dev.db-journal
 .next/
+prompt.txt
+readme.txt
