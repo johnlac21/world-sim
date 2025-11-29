@@ -73,6 +73,9 @@ type PersonPayload = {
   age: number;
   isAlive: boolean;
   isPlayer: boolean;
+  // ⭐ NEW
+  personalityArchetype: string;
+  personalitySubtype: string;
   stats: StatBlock;
   currentJob: {
     title: string;
@@ -181,7 +184,8 @@ export default function PersonPage() {
           </Link>
         </div>
         <h1 className="text-2xl font-bold">
-          {data.name} {data.isPlayer && <span className="text-sm">(Player)</span>}
+          {data.name}{' '}
+          {data.isPlayer && <span className="text-sm text-gray-600">(Player)</span>}
         </h1>
         <p>
           Age {data.age} {data.isAlive ? '' : '(deceased)'}
@@ -191,6 +195,12 @@ export default function PersonPage() {
           {data.countryName ? ` · Country: ${data.countryName}` : ''}
         </p>
         <p className="text-sm text-gray-600">Born in year {data.birthYear}</p>
+
+        {/* ⭐ NEW: Personality summary */}
+        <p className="text-sm text-gray-700 mt-1">
+          <span className="font-semibold">Personality:</span>{' '}
+          {data.personalityArchetype} — {data.personalitySubtype}
+        </p>
       </header>
 
       {/* ===== Attributes ===== */}

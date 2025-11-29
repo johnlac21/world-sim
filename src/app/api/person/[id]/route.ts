@@ -71,7 +71,11 @@ export async function GET(
     isAlive: person.isAlive,
     isPlayer: person.isPlayer,
 
-    // 🔥 NEW: full 24-stat block
+    // ⭐ NEW: personality fields
+    personalityArchetype: person.personalityArchetype,
+    personalitySubtype: person.personalitySubtype,
+
+    // 24-stat block
     stats: {
       // Cognitive
       intelligence: person.intelligence,

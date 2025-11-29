@@ -1,7 +1,14 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { Person } from '@prisma/client';
-import { generateBaseStats } from '@/lib/stats'; // 👈 NEW
+import {
+  generateBaseStats,
+  computeOverallRating,
+  generatePotentialOverall,
+  generateDevelopmentStyle,
+  generatePeakAge,
+} from '@/lib/stats';
+import { generatePersonalityFromStats } from '@/lib/personality';
 
 // ----- CONFIG / HELPERS -----
 
@@ -48,7 +55,9 @@ function randomName() {
 }
 
 // Salary based on some mental/social stats
-function computeBaseSalary(person: Pick<Person, 'intelligence' | 'discipline' | 'charisma'>): number {
+function computeBaseSalary(
+  person: Pick<Person, 'intelligence' | 'discipline' | 'charisma'>
+): number {
   const skill = (person.intelligence + person.discipline + person.charisma) / 3; // ~20–80
   return Math.round(25000 + (skill - 20) * (125000 / 60));
 }
@@ -97,7 +106,7 @@ export async function POST() {
       data: { controlledCountryId: controlled.id },
     });
 
-    // ----- PEOPLE -----
+    // ----- PEOPLE (NPCs) -----
     const peopleToCreate = 2000;
 
     const peopleData = Array.from({ length: peopleToCreate }).map(() => {
@@ -105,7 +114,11 @@ export async function POST() {
       const birthYear = randInt(-60, 0);
       const age = -birthYear;
 
-      const stats = generateBaseStats(); // 👈 new 24-stat profile
+      const stats = generateBaseStats();
+      const overall = computeOverallRating(stats);
+      const devStyle = generateDevelopmentStyle();
+      const peakAge = generatePeakAge(devStyle);
+      const { archetype, subtype } = generatePersonalityFromStats(stats);
 
       return {
         worldId: world.id,
@@ -114,14 +127,30 @@ export async function POST() {
         birthYear,
         age,
         isPlayer: false,
+
+        // potential & development
+        potentialOverall: generatePotentialOverall(overall),
+        peakAge,
+        developmentStyle: devStyle,
+
+        // personality
+        personalityArchetype: archetype,
+        personalitySubtype: subtype.label,
+
+        // stats
         ...stats,
       };
     });
 
     await prisma.person.createMany({ data: peopleData });
 
-    // create player character
+    // ----- PLAYER CHARACTER -----
     const playerStats = generateBaseStats();
+    const playerOverall = computeOverallRating(playerStats);
+    const playerDevStyle = generateDevelopmentStyle();
+    const playerPeakAge = generatePeakAge(playerDevStyle);
+    const { archetype: playerArchetype, subtype: playerSubtype } =
+      generatePersonalityFromStats(playerStats);
 
     const player = await prisma.person.create({
       data: {
@@ -131,7 +160,15 @@ export async function POST() {
         birthYear: 0,
         age: 0,
         isPlayer: true,
-        ...playerStats, // 👈 make sure Player has all required stats too
+
+        potentialOverall: generatePotentialOverall(playerOverall),
+        peakAge: playerPeakAge,
+        developmentStyle: playerDevStyle,
+
+        personalityArchetype: playerArchetype,
+        personalitySubtype: playerSubtype.label,
+
+        ...playerStats,
       },
     });
 
@@ -182,7 +219,9 @@ export async function POST() {
           arr.push(
             prisma.company.create({
               data: {
-                name: `${pickRandom(COMPANY_NAMES)} ${country.name.split(' ')[0]} ${i + 1}`,
+                name: `${pickRandom(COMPANY_NAMES)} ${country.name.split(' ')[0]} ${
+                  i + 1
+                }`,
                 countryId: country.id,
                 worldId: world.id,
               },
@@ -202,7 +241,7 @@ export async function POST() {
     }
 
     // ----- OFFICES (WORLD + COUNTRY LEADERS) -----
-    const worldOffice = await prisma.office.create({
+    await prisma.office.create({
       data: {
         name: 'World President',
         level: 'World',
@@ -213,7 +252,7 @@ export async function POST() {
       },
     });
 
-    const countryOffices = await prisma.$transaction(
+    await prisma.$transaction(
       countries.map((country) =>
         prisma.office.create({
           data: {
@@ -233,7 +272,7 @@ export async function POST() {
     const enrollmentCreates: any[] = [];
 
     for (const person of allPeople) {
-      const isPlayer = person.id === player.id;
+      const isPlayerPerson = person.id === player.id;
       const age = person.age;
 
       // === education ===
@@ -271,18 +310,19 @@ export async function POST() {
       // === jobs ===
       const workingAge = age >= 18 && age <= 65;
       const countryCompanies =
-        (person.countryId && companiesByCountry.get(person.countryId)) || companies;
+        (person.countryId && companiesByCountry.get(person.countryId)) ||
+        companies;
 
       if (!countryCompanies || countryCompanies.length === 0) continue;
 
       // Player always gets a job; NPCs ~60% if working age
-      if (!isPlayer) {
+      if (!isPlayerPerson) {
         if (!workingAge) continue;
         if (Math.random() > 0.6) continue;
       }
 
       const company = pickRandom(countryCompanies);
-      const title = isPlayer ? 'Player Character' : pickRandom(JOB_TITLES);
+      const title = isPlayerPerson ? 'Player Character' : pickRandom(JOB_TITLES);
       const salary = computeBaseSalary(person);
 
       employmentCreates.push(

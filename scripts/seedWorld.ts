@@ -1,5 +1,5 @@
 // scripts/seedWorld.ts
-import { PrismaClient, Person, DevelopmentStyle } from '@prisma/client';
+import { PrismaClient, Person } from '@prisma/client';
 import {
   generateBaseStats,
   computeOverallRating,
@@ -7,6 +7,7 @@ import {
   generateDevelopmentStyle,
   generatePeakAge,
 } from '../src/lib/stats';
+import { generatePersonalityFromStats } from '../src/lib/personality';
 
 const prisma = new PrismaClient();
 
@@ -62,7 +63,9 @@ function randomName() {
 }
 
 // Salary based on some mental/social stats
-function computeBaseSalary(person: Pick<Person, 'intelligence' | 'discipline' | 'charisma'>): number {
+function computeBaseSalary(
+  person: Pick<Person, 'intelligence' | 'discipline' | 'charisma'>
+): number {
   const skill = (person.intelligence + person.discipline + person.charisma) / 3; // ~20–80
   return Math.round(25000 + (skill - 20) * (125000 / 60));
 }
@@ -117,6 +120,8 @@ async function main() {
     const devStyle = generateDevelopmentStyle();
     const peakAge = generatePeakAge(devStyle);
 
+    const { archetype, subtype } = generatePersonalityFromStats(stats);
+
     return {
       worldId: world.id,
       countryId: country.id,
@@ -124,10 +129,16 @@ async function main() {
       birthYear,
       age,
       isPlayer: false,
+
       // potential & development
       potentialOverall: generatePotentialOverall(overall),
       peakAge,
-      developmentStyle: devStyle as DevelopmentStyle,
+      developmentStyle: devStyle, // plain string: "EARLY" | "NORMAL" | ...
+
+      // personality
+      personalityArchetype: archetype,
+      personalitySubtype: subtype.label,
+
       // spread new stat profile
       ...stats,
     };

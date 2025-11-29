@@ -101,8 +101,13 @@ model Person {
   // =========================
   potentialOverall Int    @default(60)
   peakAge          Int    @default(35)
-  developmentStyle String @default("NORMAL")
+  developmentStyle String @default("NORMAL") // "EARLY" | "NORMAL" | "LATE" | "VOLATILE"
 
+  // =========================
+  // Personality system
+  // =========================
+  personalityArchetype String // e.g. "Visionary", "Leader"
+  personalitySubtype  String // e.g. "Dream Architect", "People's Champion"
 
   isAlive  Boolean @default(true)
   isPlayer Boolean @default(false)
@@ -173,7 +178,7 @@ model School {
   id       Int    @id @default(autoincrement())
   name     String
   level    String // "Primary" | "Secondary" | "University"
-  prestige Int // 1–100
+  prestige Int    // 1–100
 
   world   World @relation(fields: [worldId], references: [id])
   worldId Int
@@ -237,8 +242,8 @@ model Office {
   id         Int    @id @default(autoincrement())
   name       String // e.g. "World President", "President of Alboria"
   level      String // "World" | "Country"
-  termLength Int // in years
-  prestige   Int // 1–100, boosts winner prestige
+  termLength Int    // in years
+  prestige   Int    // 1–100, boosts winner prestige
 
   world   World @relation(fields: [worldId], references: [id])
   worldId Int
