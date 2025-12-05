@@ -133,6 +133,9 @@ model Person {
   employments Employment[]
   enrollments Enrollment[]
 
+  // Industry/company hierarchy positions (Ticket A / Industry hierarchies)
+  companyPositions CompanyPosition[]
+
   // ==== OPTION D: politics / prestige ====
   terms    Term[] // offices held over time
   prestige Int    @default(0)
@@ -155,7 +158,11 @@ model Company {
   countryId Int
 
   employments Employment[]
-  createdAt   DateTime     @default(now())
+
+  // Industry hierarchy positions inside this company
+  positions CompanyPosition[]
+
+  createdAt DateTime @default(now())
 }
 
 // Jobs
@@ -268,6 +275,43 @@ model Term {
 
   person   Person @relation(fields: [personId], references: [id])
   personId Int
+
+  startYear Int
+  endYear   Int?
+
+  createdAt DateTime @default(now())
+}
+
+// ===============================
+// Industry hierarchy models
+// ===============================
+
+// Defines a role within an industry hierarchy (e.g. President, VP, Manager).
+// These are global templates keyed by a string industry name.
+model IndustryRole {
+  id       Int    @id @default(autoincrement())
+  industry String // e.g. "TECH", "FINANCE", "RESEARCH"
+  name     String // e.g. "President", "Vice President"
+  rank     Int    // 0 = top of hierarchy, larger = lower tiers
+
+  positions CompanyPosition[]
+
+  createdAt DateTime @default(now())
+}
+
+// Connects a person to a company in a specific industry role.
+// This is the BBGM-style "slot" in an industry hierarchy.
+model CompanyPosition {
+  id Int @id @default(autoincrement())
+
+  company   Company @relation(fields: [companyId], references: [id])
+  companyId Int
+
+  person   Person @relation(fields: [personId], references: [id])
+  personId Int
+
+  role   IndustryRole @relation(fields: [roleId], references: [id])
+  roleId Int
 
   startYear Int
   endYear   Int?

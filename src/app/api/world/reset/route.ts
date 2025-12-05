@@ -37,11 +37,25 @@ const JOB_TITLES = [
 
 const SCHOOL_LEVELS = ['Primary', 'Secondary', 'University'] as const;
 
-// Local industry type for reset seeding (Ticket 1).
+// Local industry type for reset seeding.
 // Kept as a TS union, not a Prisma enum, so the DB column stays flexible.
 type IndustryType = 'TECH' | 'FINANCE' | 'RESEARCH';
 
 const INDUSTRIES: IndustryType[] = ['TECH', 'FINANCE', 'RESEARCH'];
+
+// Base hierarchy of roles per industry (global templates).
+const BASE_INDUSTRY_ROLES: { name: string; rank: number }[] = [
+  { name: 'President', rank: 0 },
+  { name: 'Vice President', rank: 1 },
+  { name: 'Senior Manager', rank: 2 },
+  { name: 'Manager', rank: 3 },
+  { name: 'Associate Manager', rank: 4 },
+  { name: 'Lead Analyst', rank: 5 },
+  { name: 'Analyst', rank: 6 },
+  { name: 'Junior Analyst', rank: 7 },
+  { name: 'Trainee', rank: 8 },
+  { name: 'Worker', rank: 9 },
+];
 
 function randInt(min: number, max: number) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -77,6 +91,7 @@ export async function POST() {
     await prisma.marriage.deleteMany();
     await prisma.enrollment.deleteMany();
     await prisma.employment.deleteMany();
+    await prisma.companyPosition.deleteMany();
     await prisma.term.deleteMany();
     await prisma.school.deleteMany();
     await prisma.company.deleteMany();
@@ -84,6 +99,7 @@ export async function POST() {
     await prisma.person.deleteMany();
     await prisma.country.deleteMany();
     await prisma.world.deleteMany();
+    await prisma.industryRole.deleteMany();
 
     // ----- WORLD -----
     const world = await prisma.world.create({
@@ -110,6 +126,17 @@ export async function POST() {
     await prisma.world.update({
       where: { id: world.id },
       data: { controlledCountryId: controlled.id },
+    });
+
+    // ----- INDUSTRY ROLES (GLOBAL HIERARCHY) -----
+    await prisma.industryRole.createMany({
+      data: INDUSTRIES.flatMap((industry) =>
+        BASE_INDUSTRY_ROLES.map((role) => ({
+          industry,
+          name: role.name,
+          rank: role.rank,
+        })),
+      ),
     });
 
     // ----- PEOPLE (NPCs) -----
@@ -186,7 +213,7 @@ export async function POST() {
     // ----- SCHOOLS -----
     const schools = await prisma.$transaction(
       countries.flatMap((country) => {
-        const arr = [];
+        const arr: Promise<any>[] = [];
         for (const level of SCHOOL_LEVELS) {
           const numSchools = level === 'University' ? 1 : 2; // each country: 2 primary, 2 secondary, 1 uni
           for (let i = 0; i < numSchools; i++) {
@@ -223,7 +250,7 @@ export async function POST() {
     const companies = await prisma.$transaction(
       countries.flatMap((country) => {
         const numCompanies = 3 + Math.floor(Math.random() * 4); // 3–6 per country
-        const arr = [];
+        const arr: Promise<any>[] = [];
         for (let i = 0; i < numCompanies; i++) {
           // rotate industries for a roughly even spread per country
           const industry: IndustryType = INDUSTRIES[i % INDUSTRIES.length];

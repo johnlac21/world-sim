@@ -36,12 +36,28 @@ const JOB_TITLES = [
 
 const SCHOOL_LEVELS = ['Primary', 'Secondary', 'University'] as const;
 
-// Local industry type for seeding companies (Ticket 1).
+// Local industry type for seeding companies (Ticket 1 / Industry v0).
 // We deliberately keep this as a TypeScript union, not a Prisma enum,
 // so the database column remains a flexible STRING.
 type IndustryType = 'TECH' | 'FINANCE' | 'RESEARCH';
 
 const INDUSTRIES: IndustryType[] = ['TECH', 'FINANCE', 'RESEARCH'];
+
+// Base hierarchy of roles per industry (Ticket A / hierarchy v0).
+// These are global templates; CompanyPosition will eventually connect
+// specific people to these roles inside specific companies.
+const BASE_INDUSTRY_ROLES: { name: string; rank: number }[] = [
+  { name: 'President', rank: 0 },
+  { name: 'Vice President', rank: 1 },
+  { name: 'Senior Manager', rank: 2 },
+  { name: 'Manager', rank: 3 },
+  { name: 'Associate Manager', rank: 4 },
+  { name: 'Lead Analyst', rank: 5 },
+  { name: 'Analyst', rank: 6 },
+  { name: 'Junior Analyst', rank: 7 },
+  { name: 'Trainee', rank: 8 },
+  { name: 'Worker', rank: 9 },
+];
 
 function randInt(min: number, max: number) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -83,11 +99,15 @@ async function main() {
   await prisma.marriage.deleteMany();
   await prisma.enrollment.deleteMany();
   await prisma.employment.deleteMany();
+  await prisma.companyPosition.deleteMany();
+  await prisma.term.deleteMany();
   await prisma.school.deleteMany();
   await prisma.company.deleteMany();
+  await prisma.office.deleteMany();
   await prisma.person.deleteMany();
   await prisma.country.deleteMany();
   await prisma.world.deleteMany();
+  await prisma.industryRole.deleteMany();
 
   const world = await prisma.world.create({
     data: {
@@ -113,6 +133,17 @@ async function main() {
     data: {
       controlledCountryId: countries[0].id, // pick first country for now
     },
+  });
+
+  // ===== INDUSTRY ROLES (HIERARCHY TEMPLATES) =====
+  await prisma.industryRole.createMany({
+    data: INDUSTRIES.flatMap((industry) =>
+      BASE_INDUSTRY_ROLES.map((role) => ({
+        industry,
+        name: role.name,
+        rank: role.rank,
+      })),
+    ),
   });
 
   const peopleToCreate = 2000;
@@ -177,7 +208,7 @@ async function main() {
     }),
   );
 
-  const schoolsByCountryLevel = new Map<string, typeof schools>();
+  const schoolsByCountryLevel = new Map<string, (typeof schools)[number][]>();
 
   for (const s of schools) {
     const key = `${s.countryId}-${s.level}`;
@@ -198,7 +229,9 @@ async function main() {
         arr.push(
           prisma.company.create({
             data: {
-              name: `${pickRandom(COMPANY_NAMES)} ${country.name.split(' ')[0]} ${i + 1}`,
+              name: `${pickRandom(COMPANY_NAMES)} ${
+                country.name.split(' ')[0]
+              } ${i + 1}`,
               countryId: country.id,
               worldId: world.id,
               industry,
@@ -212,7 +245,7 @@ async function main() {
 
   // ===== OFFICES (GOVERNMENTS) =====
   // One world-level leader + one president per country
-  const worldOffice = await prisma.office.create({
+  await prisma.office.create({
     data: {
       name: 'World President',
       level: 'World',
@@ -223,7 +256,7 @@ async function main() {
     },
   });
 
-  const countryOffices = await prisma.$transaction(
+  await prisma.$transaction(
     countries.map((country) =>
       prisma.office.create({
         data: {
@@ -238,7 +271,7 @@ async function main() {
     ),
   );
 
-  const companiesByCountry = new Map<number, typeof companies>();
+  const companiesByCountry = new Map<number, (typeof companies)[number][]>();
   for (const country of countries) {
     companiesByCountry.set(
       country.id,
@@ -296,7 +329,8 @@ async function main() {
     // JOBS
     const workingAge = age >= 18 && age <= 65;
     const countryCompanies =
-      (person.countryId && companiesByCountry.get(person.countryId)) || companies;
+      (person.countryId && companiesByCountry.get(person.countryId)) ||
+      companies;
 
     if (!countryCompanies || countryCompanies.length === 0) continue;
 
@@ -325,7 +359,7 @@ async function main() {
 
   // ===== INITIAL MARRIAGES =====
   // Pair up adults (20–40) within each country
-  const adultsByCountry = new Map<number, typeof allPeople>();
+  const adultsByCountry = new Map<number, (typeof allPeople)[number][]>();
 
   for (const person of allPeople) {
     if (person.age < 20 || person.age > 40) continue;
@@ -336,7 +370,7 @@ async function main() {
     adultsByCountry.set(person.countryId, arr);
   }
 
-  for (const [countryId, adults] of adultsByCountry.entries()) {
+  for (const [, adults] of adultsByCountry.entries()) {
     const pool = shuffle(adults);
 
     for (let i = 0; i + 1 < pool.length; i += 2) {
@@ -358,7 +392,7 @@ async function main() {
   }
 
   // ===== INITIAL FRIENDSHIPS =====
-  const peopleByCountry = new Map<number, typeof allPeople>();
+  const peopleByCountry = new Map<number, (typeof allPeople)[number][]>();
   for (const person of allPeople) {
     if (!person.countryId) continue;
     const arr = peopleByCountry.get(person.countryId) || [];
@@ -368,7 +402,7 @@ async function main() {
 
   const friendshipSet = new Set<string>(); // 'minId-maxId' to avoid duplicates
 
-  for (const [countryId, people] of peopleByCountry.entries()) {
+  for (const [, people] of peopleByCountry.entries()) {
     if (people.length < 2) continue;
 
     for (const person of people) {
