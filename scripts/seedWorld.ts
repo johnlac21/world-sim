@@ -44,8 +44,8 @@ type IndustryType = 'TECH' | 'FINANCE' | 'RESEARCH';
 const INDUSTRIES: IndustryType[] = ['TECH', 'FINANCE', 'RESEARCH'];
 
 // Base hierarchy of roles per industry (Ticket A / hierarchy v0).
-// These are global templates; CompanyPosition will eventually connect
-// specific people to these roles inside specific companies.
+// These are global templates; CompanyPosition connects specific people
+// to these roles inside specific companies.
 const BASE_INDUSTRY_ROLES: { name: string; rank: number }[] = [
   { name: 'President', rank: 0 },
   { name: 'Vice President', rank: 1 },
@@ -91,6 +91,54 @@ function computeBaseSalary(
 ): number {
   const skill = (person.intelligence + person.discipline + person.charisma) / 3; // ~20–80
   return Math.round(25000 + (skill - 20) * (125000 / 60));
+}
+
+// ===== ROLE SCORE HELPERS (Ticket B — Positions v1) =====
+
+// Exec: President / VP (ranks 0–1)
+function execScore(p: Person): number {
+  return (
+    0.35 * p.leadership +
+    0.20 * p.judgment +
+    0.15 * p.charisma +
+    0.15 * p.communication +
+    0.10 * p.discipline +
+    0.05 * p.confidence
+  );
+}
+
+// Manager: Senior Manager / Manager / Associate Manager (ranks 2–4)
+function managerScore(p: Person): number {
+  return (
+    0.30 * p.leadership +
+    0.20 * p.discipline +
+    0.15 * p.communication +
+    0.15 * p.judgment +
+    0.10 * p.empathy +
+    0.10 * p.negotiation
+  );
+}
+
+// Contributor / worker: Lead Analyst → Worker (ranks 5–9)
+function contributorScore(p: Person): number {
+  return (
+    0.30 * p.intelligence +
+    0.20 * p.discipline +
+    0.15 * p.adaptability +
+    0.10 * p.memory +
+    0.10 * p.creativity +
+    0.15 * p.stability
+  );
+}
+
+function computeRoleScore(p: Person, roleRank: number): number {
+  if (roleRank <= 1) {
+    return execScore(p);
+  }
+  if (roleRank <= 4) {
+    return managerScore(p);
+  }
+  return contributorScore(p);
 }
 
 async function main() {
@@ -187,7 +235,7 @@ async function main() {
   // ===== SCHOOLS (EDUCATION) =====
   const schools = await prisma.$transaction(
     countries.flatMap((country) => {
-      const arr = [];
+      const arr: Promise<any>[] = [];
       for (const level of SCHOOL_LEVELS) {
         const numSchools = level === 'University' ? 1 : 2; // each country: 2 primary, 2 secondary, 1 uni
         for (let i = 0; i < numSchools; i++) {
@@ -221,7 +269,7 @@ async function main() {
   const companies = await prisma.$transaction(
     countries.flatMap((country) => {
       const numCompanies = 3 + Math.floor(Math.random() * 4); // 3–6 per country
-      const arr = [];
+      const arr: Promise<any>[] = [];
       for (let i = 0; i < numCompanies; i++) {
         // Rotate industries for a roughly even spread per country.
         const industry: IndustryType = INDUSTRIES[i % INDUSTRIES.length];
@@ -287,6 +335,10 @@ async function main() {
   const enrollmentCreates: any[] = [];
   const marriageCreates: any[] = [];
   const friendshipCreates: any[] = [];
+  const companyPositionCreates: any[] = [];
+
+  // Track employees per company so we can assign hierarchy roles.
+  const employeesByCompany = new Map<number, Person[]>();
 
   // ===== INITIAL EDUCATION + JOBS =====
   for (const person of allPeople) {
@@ -344,6 +396,7 @@ async function main() {
     const title = isPlayer ? 'Player Character' : pickRandom(JOB_TITLES);
     const salary = computeBaseSalary(person);
 
+    // Track for Employment
     employmentCreates.push(
       prisma.employment.create({
         data: {
@@ -355,6 +408,11 @@ async function main() {
         },
       }),
     );
+
+    // Track employees per company for hierarchy assignment
+    const list = employeesByCompany.get(company.id) || [];
+    list.push(person);
+    employeesByCompany.set(company.id, list);
   }
 
   // ===== INITIAL MARRIAGES =====
@@ -433,15 +491,63 @@ async function main() {
     }
   }
 
+  // ===== COMPANY POSITIONS (INDUSTRY HIERARCHY ASSIGNMENT) =====
+  const allIndustryRoles = await prisma.industryRole.findMany();
+
+  for (const company of companies) {
+    const employees = [...(employeesByCompany.get(company.id) || [])];
+    if (employees.length === 0) continue;
+
+    const rolesForIndustry = allIndustryRoles
+      .filter((r) => r.industry === company.industry)
+      .sort((a, b) => a.rank - b.rank); // top of hierarchy first
+
+    // We'll fill roles from President downward until we run out of employees.
+    const availableEmployees = [...employees];
+
+    for (const role of rolesForIndustry) {
+      if (availableEmployees.length === 0) break;
+
+      // Pick best candidate for this role based on roleRank-specific score.
+      let bestIdx = 0;
+      let bestScore = -Infinity;
+
+      for (let i = 0; i < availableEmployees.length; i++) {
+        const candidate = availableEmployees[i];
+        const score = computeRoleScore(candidate, role.rank);
+        if (score > bestScore) {
+          bestScore = score;
+          bestIdx = i;
+        }
+      }
+
+      const [chosen] = availableEmployees.splice(bestIdx, 1);
+      if (!chosen) continue;
+
+      companyPositionCreates.push(
+        prisma.companyPosition.create({
+          data: {
+            companyId: company.id,
+            personId: chosen.id,
+            roleId: role.id,
+            startYear: world.currentYear,
+            endYear: null,
+          },
+        }),
+      );
+    }
+  }
+
   await prisma.$transaction([
     ...enrollmentCreates,
     ...employmentCreates,
     ...marriageCreates,
     ...friendshipCreates,
+    ...companyPositionCreates,
   ]);
 
   console.log(
-    `Seeded world ${world.id} with ${countries.length} countries, ${peopleToCreate} people, ${companies.length} companies, ${schools.length} schools, ${employmentCreates.length} jobs, ${enrollmentCreates.length} enrollments, ${marriageCreates.length} marriages, ${friendshipCreates.length} friendships.`,
+    `Seeded world ${world.id} with ${countries.length} countries, ${peopleToCreate} people, ${companies.length} companies, ${schools.length} schools, ${employmentCreates.length} jobs, ${enrollmentCreates.length} enrollments, ${marriageCreates.length} marriages, ${friendshipCreates.length} friendships, ${companyPositionCreates.length} company positions.`,
   );
 }
 

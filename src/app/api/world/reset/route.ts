@@ -82,6 +82,54 @@ function computeBaseSalary(
   return Math.round(25000 + (skill - 20) * (125000 / 60));
 }
 
+// ===== ROLE SCORE HELPERS (Ticket B — Positions v1) =====
+
+// Exec: President / VP (ranks 0–1)
+function execScore(p: Person): number {
+  return (
+    0.35 * p.leadership +
+    0.20 * p.judgment +
+    0.15 * p.charisma +
+    0.15 * p.communication +
+    0.10 * p.discipline +
+    0.05 * p.confidence
+  );
+}
+
+// Manager: Senior Manager / Manager / Associate Manager (ranks 2–4)
+function managerScore(p: Person): number {
+  return (
+    0.30 * p.leadership +
+    0.20 * p.discipline +
+    0.15 * p.communication +
+    0.15 * p.judgment +
+    0.10 * p.empathy +
+    0.10 * p.negotiation
+  );
+}
+
+// Contributor / worker: Lead Analyst → Worker (ranks 5–9)
+function contributorScore(p: Person): number {
+  return (
+    0.30 * p.intelligence +
+    0.20 * p.discipline +
+    0.15 * p.adaptability +
+    0.10 * p.memory +
+    0.10 * p.creativity +
+    0.15 * p.stability
+  );
+}
+
+function computeRoleScore(p: Person, roleRank: number): number {
+  if (roleRank <= 1) {
+    return execScore(p);
+  }
+  if (roleRank <= 4) {
+    return managerScore(p);
+  }
+  return contributorScore(p);
+}
+
 // ----- MAIN RESET HANDLER -----
 
 export async function POST() {
@@ -313,6 +361,10 @@ export async function POST() {
     // ----- INITIAL JOBS + ENROLLMENTS -----
     const employmentCreates: any[] = [];
     const enrollmentCreates: any[] = [];
+    const companyPositionCreates: any[] = [];
+
+    // Track employees per company to assign hierarchy positions later
+    const employeesByCompany = new Map<number, Person[]>();
 
     for (const person of allPeople) {
       const isPlayerPerson = person.id === player.id;
@@ -379,11 +431,63 @@ export async function POST() {
           },
         }),
       );
+
+      // Track this person as an employee of the company
+      const list = employeesByCompany.get(company.id) || [];
+      list.push(person);
+      employeesByCompany.set(company.id, list);
+    }
+
+    // ----- COMPANY POSITIONS (INDUSTRY HIERARCHY ASSIGNMENT) -----
+    const allIndustryRoles = await prisma.industryRole.findMany();
+
+    for (const company of companies) {
+      const employees = [...(employeesByCompany.get(company.id) || [])];
+      if (employees.length === 0) continue;
+
+      const rolesForIndustry = allIndustryRoles
+        .filter((r) => r.industry === company.industry)
+        .sort((a, b) => a.rank - b.rank); // top of hierarchy first
+
+      const availableEmployees = [...employees];
+
+      for (const role of rolesForIndustry) {
+        if (availableEmployees.length === 0) break;
+
+        // Pick best candidate for this role based on roleRank-specific score.
+        let bestIdx = 0;
+        let bestScore = -Infinity;
+
+        for (let i = 0; i < availableEmployees.length; i++) {
+          const candidate = availableEmployees[i];
+          const score = computeRoleScore(candidate, role.rank);
+          if (score > bestScore) {
+            bestScore = score;
+            bestIdx = i;
+          }
+        }
+
+        const [chosen] = availableEmployees.splice(bestIdx, 1);
+        if (!chosen) continue;
+
+        companyPositionCreates.push(
+          prisma.companyPosition.create({
+            data: {
+              companyId: company.id,
+              personId: chosen.id,
+              roleId: role.id,
+              startYear: world.currentYear,
+              endYear: null,
+            },
+          }),
+        );
+      }
     }
 
     await prisma.$transaction([
       ...enrollmentCreates,
       ...employmentCreates,
+      ...companyPositionCreates,
     ]);
 
     return NextResponse.json({
@@ -395,6 +499,7 @@ export async function POST() {
       schools: schools.length,
       jobs: employmentCreates.length,
       enrollments: enrollmentCreates.length,
+      positions: companyPositionCreates.length,
     });
   } catch (err) {
     console.error('Reset world failed:', err);

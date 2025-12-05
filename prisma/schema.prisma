@@ -133,7 +133,7 @@ model Person {
   employments Employment[]
   enrollments Enrollment[]
 
-  // Industry/company hierarchy positions (Ticket A / Industry hierarchies)
+  // Industry/company hierarchy positions
   companyPositions CompanyPosition[]
 
   // ==== OPTION D: politics / prestige ====
@@ -148,7 +148,7 @@ model Company {
   id   Int    @id @default(autoincrement())
   name String
 
-  // NEW: flexible string industry field (e.g. "TECH", "FINANCE", "RESEARCH")
+  // Flexible string industry field (e.g. "TECH", "FINANCE", "RESEARCH")
   industry String
 
   world   World @relation(fields: [worldId], references: [id])
@@ -216,7 +216,7 @@ model Enrollment {
   createdAt DateTime @default(now())
 }
 
-// NEW: Marriages (Option C)
+// Marriages (Option C)
 model Marriage {
   id Int @id @default(autoincrement())
 
@@ -232,7 +232,7 @@ model Marriage {
   createdAt DateTime @default(now())
 }
 
-// NEW: Friendships (Option C)
+// Friendships (Option C)
 model Friendship {
   id Int @id @default(autoincrement())
 
