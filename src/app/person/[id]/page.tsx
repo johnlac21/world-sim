@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 
-// === NEW STAT BLOCK ===
+// === STAT BLOCK ===
 type StatBlock = {
   // Cognitive
   intelligence: number;
@@ -43,6 +43,7 @@ type Job = {
   id: number;
   title: string;
   companyId: number;
+  companyName: string;
   salary: number;
   startYear: number;
   endYear: number | null;
@@ -73,23 +74,30 @@ type PersonPayload = {
   age: number;
   isAlive: boolean;
   isPlayer: boolean;
-  // ⭐ NEW
+
   personalityArchetype: string;
   personalitySubtype: string;
+
   stats: StatBlock;
+
   currentJob: {
     title: string;
     companyId: number;
+    companyName: string;
     salary: number;
     startYear: number;
   } | null;
+
   pastJobs: Job[];
+
   currentEnrollment: {
     schoolName: string;
     level: string;
     startYear: number;
   } | null;
+
   pastEnrollments: Enrollment[];
+
   spouses: Spouse[];
 };
 
@@ -185,7 +193,9 @@ export default function PersonPage() {
         </div>
         <h1 className="text-2xl font-bold">
           {data.name}{' '}
-          {data.isPlayer && <span className="text-sm text-gray-600">(Player)</span>}
+          {data.isPlayer && (
+            <span className="text-sm text-gray-600">(Player)</span>
+          )}
         </h1>
         <p>
           Age {data.age} {data.isAlive ? '' : '(deceased)'}
@@ -196,7 +206,6 @@ export default function PersonPage() {
         </p>
         <p className="text-sm text-gray-600">Born in year {data.birthYear}</p>
 
-        {/* ⭐ NEW: Personality summary */}
         <p className="text-sm text-gray-700 mt-1">
           <span className="font-semibold">Personality:</span>{' '}
           {data.personalityArchetype} — {data.personalitySubtype}
@@ -228,8 +237,14 @@ export default function PersonPage() {
         <h2 className="text-xl font-semibold mb-2">Career</h2>
         {data.currentJob ? (
           <p className="text-sm mb-2">
-            Current job: {data.currentJob.title} (company {data.currentJob.companyId}) —
-            salary {data.currentJob.salary.toLocaleString()} — since year{' '}
+            Current job: {data.currentJob.title} at{' '}
+            <Link
+              href={`/company/${data.currentJob.companyId}`}
+              className="text-blue-600 underline"
+            >
+              {data.currentJob.companyName}
+            </Link>{' '}
+            — salary {data.currentJob.salary.toLocaleString()} — since year{' '}
             {data.currentJob.startYear}
           </p>
         ) : (
@@ -242,7 +257,14 @@ export default function PersonPage() {
             <ul className="list-disc ml-6 text-sm">
               {data.pastJobs.map((j) => (
                 <li key={j.id}>
-                  {j.title} (company {j.companyId}) — {j.startYear}
+                  {j.title} at{' '}
+                  <Link
+                    href={`/company/${j.companyId}`}
+                    className="text-blue-600 underline"
+                  >
+                    {j.companyName}
+                  </Link>{' '}
+                  — {j.startYear}
                   {j.endYear != null ? `–${j.endYear}` : ''}
                 </li>
               ))}
@@ -257,7 +279,8 @@ export default function PersonPage() {
         {data.currentEnrollment ? (
           <p className="text-sm mb-2">
             Currently at {data.currentEnrollment.schoolName} (
-            {data.currentEnrollment.level}) — since year {data.currentEnrollment.startYear}
+            {data.currentEnrollment.level}) — since year{' '}
+            {data.currentEnrollment.startYear}
           </p>
         ) : (
           <p className="text-sm mb-2">Not currently enrolled.</p>
@@ -287,12 +310,12 @@ export default function PersonPage() {
           <ul className="list-disc ml-6 text-sm">
             {data.spouses.map((s) => (
               <li key={s.marriageId}>
-                <a
+                <Link
                   href={`/person/${s.spouseId}`}
                   className="text-blue-600 underline"
                 >
                   {s.spouseName}
-                </a>{' '}
+                </Link>{' '}
                 — married {s.startYear}
                 {s.endYear != null ? `–${s.endYear}` : ''}
               </li>

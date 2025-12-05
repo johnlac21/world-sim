@@ -19,6 +19,7 @@ export async function GET(
       country: true,
       employments: {
         orderBy: { startYear: 'asc' },
+        include: { company: true }, // ⬅ include company so we can show name + link
       },
       enrollments: {
         include: { school: true },
@@ -54,7 +55,8 @@ export async function GET(
     })),
   ].sort((a, b) => a.startYear - b.startYear);
 
-  const currentJob = person.employments.find((e) => e.endYear === null) ?? null;
+  const currentJob =
+    person.employments.find((e) => e.endYear === null) ?? null;
   const pastJobs = person.employments.filter((e) => e.endYear !== null);
 
   const currentEnrollment =
@@ -71,7 +73,7 @@ export async function GET(
     isAlive: person.isAlive,
     isPlayer: person.isPlayer,
 
-    // ⭐ NEW: personality fields
+    // personality
     personalityArchetype: person.personalityArchetype,
     personalitySubtype: person.personalitySubtype,
 
@@ -114,14 +116,17 @@ export async function GET(
       ? {
           title: currentJob.title,
           companyId: currentJob.companyId,
+          companyName: currentJob.company.name,
           salary: currentJob.salary,
           startYear: currentJob.startYear,
         }
       : null,
+
     pastJobs: pastJobs.map((j) => ({
       id: j.id,
       title: j.title,
       companyId: j.companyId,
+      companyName: j.company.name,
       salary: j.salary,
       startYear: j.startYear,
       endYear: j.endYear,
@@ -134,6 +139,7 @@ export async function GET(
           startYear: currentEnrollment.startYear,
         }
       : null,
+
     pastEnrollments: pastEnrollments.map((e) => ({
       id: e.id,
       schoolName: e.school.name,
