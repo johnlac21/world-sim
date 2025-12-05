@@ -37,6 +37,12 @@ const JOB_TITLES = [
 
 const SCHOOL_LEVELS = ['Primary', 'Secondary', 'University'] as const;
 
+// Local industry type for reset seeding (Ticket 1).
+// Kept as a TS union, not a Prisma enum, so the DB column stays flexible.
+type IndustryType = 'TECH' | 'FINANCE' | 'RESEARCH';
+
+const INDUSTRIES: IndustryType[] = ['TECH', 'FINANCE', 'RESEARCH'];
+
 function randInt(min: number, max: number) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
@@ -56,7 +62,7 @@ function randomName() {
 
 // Salary based on some mental/social stats
 function computeBaseSalary(
-  person: Pick<Person, 'intelligence' | 'discipline' | 'charisma'>
+  person: Pick<Person, 'intelligence' | 'discipline' | 'charisma'>,
 ): number {
   const skill = (person.intelligence + person.discipline + person.charisma) / 3; // ~20–80
   return Math.round(25000 + (skill - 20) * (125000 / 60));
@@ -201,7 +207,10 @@ export async function POST() {
       }),
     );
 
-    const schoolsByCountryLevel = new Map<string, (typeof schools)[number][]>();
+    const schoolsByCountryLevel = new Map<
+      string,
+      (typeof schools)[number][]
+    >();
 
     for (const s of schools) {
       const key = `${s.countryId}-${s.level}`;
@@ -216,14 +225,18 @@ export async function POST() {
         const numCompanies = 3 + Math.floor(Math.random() * 4); // 3–6 per country
         const arr = [];
         for (let i = 0; i < numCompanies; i++) {
+          // rotate industries for a roughly even spread per country
+          const industry: IndustryType = INDUSTRIES[i % INDUSTRIES.length];
+
           arr.push(
             prisma.company.create({
               data: {
-                name: `${pickRandom(COMPANY_NAMES)} ${country.name.split(' ')[0]} ${
-                  i + 1
-                }`,
+                name: `${pickRandom(COMPANY_NAMES)} ${
+                  country.name.split(' ')[0]
+                } ${i + 1}`,
                 countryId: country.id,
                 worldId: world.id,
+                industry,
               },
             }),
           );
@@ -232,7 +245,10 @@ export async function POST() {
       }),
     );
 
-    const companiesByCountry = new Map<number, (typeof companies)[number][]>();
+    const companiesByCountry = new Map<
+      number,
+      (typeof companies)[number][]
+    >();
     for (const country of countries) {
       companiesByCountry.set(
         country.id,

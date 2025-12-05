@@ -145,6 +145,9 @@ model Company {
   id   Int    @id @default(autoincrement())
   name String
 
+  // NEW: flexible string industry field (e.g. "TECH", "FINANCE", "RESEARCH")
+  industry String
+
   world   World @relation(fields: [worldId], references: [id])
   worldId Int
 

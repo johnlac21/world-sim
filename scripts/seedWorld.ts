@@ -36,6 +36,13 @@ const JOB_TITLES = [
 
 const SCHOOL_LEVELS = ['Primary', 'Secondary', 'University'] as const;
 
+// Local industry type for seeding companies (Ticket 1).
+// We deliberately keep this as a TypeScript union, not a Prisma enum,
+// so the database column remains a flexible STRING.
+type IndustryType = 'TECH' | 'FINANCE' | 'RESEARCH';
+
+const INDUSTRIES: IndustryType[] = ['TECH', 'FINANCE', 'RESEARCH'];
+
 function randInt(min: number, max: number) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
@@ -64,7 +71,7 @@ function randomName() {
 
 // Salary based on some mental/social stats
 function computeBaseSalary(
-  person: Pick<Person, 'intelligence' | 'discipline' | 'charisma'>
+  person: Pick<Person, 'intelligence' | 'discipline' | 'charisma'>,
 ): number {
   const skill = (person.intelligence + person.discipline + person.charisma) / 3; // ~20–80
   return Math.round(25000 + (skill - 20) * (125000 / 60));
@@ -185,12 +192,16 @@ async function main() {
       const numCompanies = 3 + Math.floor(Math.random() * 4); // 3–6 per country
       const arr = [];
       for (let i = 0; i < numCompanies; i++) {
+        // Rotate industries for a roughly even spread per country.
+        const industry: IndustryType = INDUSTRIES[i % INDUSTRIES.length];
+
         arr.push(
           prisma.company.create({
             data: {
               name: `${pickRandom(COMPANY_NAMES)} ${country.name.split(' ')[0]} ${i + 1}`,
               countryId: country.id,
               worldId: world.id,
+              industry,
             },
           }),
         );

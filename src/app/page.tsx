@@ -70,10 +70,6 @@ export default function HomePage() {
           <p>Total people: {world.peopleCount}</p>
           <p>Sample people loaded: {samplePeople.length}</p>
 
-          <p>Companies: {world.companiesCount}</p>
-          <p>Employed: {world.employedCount}</p>
-          <p>Unemployed: {world.unemployedCount}</p>
-
           <div className="mt-3 space-y-1 text-sm">
             <p>
               <Link href="/player" className="text-blue-600 underline">
@@ -134,7 +130,6 @@ export default function HomePage() {
           ))}
         </ul>
       </div>
-
     </main>
   );
 }
