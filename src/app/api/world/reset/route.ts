@@ -82,7 +82,7 @@ function computeBaseSalary(
   return Math.round(25000 + (skill - 20) * (125000 / 60));
 }
 
-// ===== ROLE SCORE HELPERS (Ticket B — Positions v1) =====
+// ===== ROLE SCORE HELPERS (Positions v1 seeding) =====
 
 // Exec: President / VP (ranks 0–1)
 function execScore(p: Person): number {
@@ -176,7 +176,7 @@ export async function POST() {
       data: { controlledCountryId: controlled.id },
     });
 
-    // ----- INDUSTRY ROLES (GLOBAL HIERARCHY) -----
+    // ----- INDUSTRY ROLES (GLOBAL HIERARCHY TEMPLATES) -----
     await prisma.industryRole.createMany({
       data: INDUSTRIES.flatMap((industry) =>
         BASE_INDUSTRY_ROLES.map((role) => ({
@@ -438,7 +438,9 @@ export async function POST() {
       employeesByCompany.set(company.id, list);
     }
 
-    // ----- COMPANY POSITIONS (INDUSTRY HIERARCHY ASSIGNMENT) -----
+    // ----- COMPANY POSITIONS (INITIAL HIERARCHY SNAPSHOT) -----
+    // This seeds the hierarchy given current employees; yearly sim will
+    // maintain and refill it using promotion + hiring logic.
     const allIndustryRoles = await prisma.industryRole.findMany();
 
     for (const company of companies) {

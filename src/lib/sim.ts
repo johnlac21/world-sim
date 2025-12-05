@@ -1,5 +1,9 @@
 // src/lib/sim.ts
-import type { Person } from '@prisma/client';
+import type {
+  Person,
+  CompanyPosition,
+  IndustryRole,
+} from '@prisma/client';
 import { prisma } from './prisma';
 import {
   STAT_KEYS,
@@ -188,6 +192,363 @@ function applyYearlyDevelopment(person: Person, newAge: number): PersonStats {
   return nextStats;
 }
 
+// ============================================================================
+// INDUSTRY HIERARCHY LOGIC (v0)
+// ============================================================================
+
+/**
+ * Cleanup invalid CompanyPosition rows:
+ * - person is dead
+ * - person.countryId !== company.countryId
+ * - role.industry !== company.industry
+ * - no active Employment at that company
+ */
+async function cleanInvalidCompanyPositions(): Promise<void> {
+  const positions = await prisma.companyPosition.findMany({
+    include: {
+      person: {
+        select: {
+          id: true,
+          isAlive: true,
+          countryId: true,
+          employments: {
+            where: { endYear: null }, // active only
+            select: { companyId: true },
+          },
+        },
+      },
+      company: {
+        select: {
+          id: true,
+          countryId: true,
+          industry: true,
+        },
+      },
+      role: {
+        select: {
+          id: true,
+          industry: true,
+        },
+      },
+    },
+  });
+
+  const invalidIds: number[] = [];
+
+  for (const pos of positions) {
+    const { person, company, role } = pos;
+    let invalid = false;
+
+    // dead
+    if (!person.isAlive) invalid = true;
+
+    // cross-country not allowed
+    if (!invalid) {
+      if (person.countryId == null || person.countryId !== company.countryId) {
+        invalid = true;
+      }
+    }
+
+    // mismatched industry
+    if (!invalid && role.industry !== company.industry) {
+      invalid = true;
+    }
+
+    // person must still be employed at this company
+    if (!invalid) {
+      const activeEmploymentAtCompany = person.employments.some(
+        (e) => e.companyId === company.id,
+      );
+      if (!activeEmploymentAtCompany) {
+        invalid = true;
+      }
+    }
+
+    if (invalid) invalidIds.push(pos.id);
+  }
+
+  if (invalidIds.length > 0) {
+    await prisma.companyPosition.deleteMany({
+      where: { id: { in: invalidIds } },
+    });
+  }
+}
+
+// Compare promotion candidates: intelligence → leadership → discipline
+function comparePromotionCandidates(
+  a: CompanyPosition & { person: Person; role: IndustryRole },
+  b: CompanyPosition & { person: Person; role: IndustryRole },
+): number {
+  if (a.person.intelligence !== b.person.intelligence) {
+    return b.person.intelligence - a.person.intelligence;
+  }
+  if (a.person.leadership !== b.person.leadership) {
+    return b.person.leadership - a.person.leadership;
+  }
+  if (a.person.discipline !== b.person.discipline) {
+    return b.person.discipline - a.person.discipline;
+  }
+  return a.id - b.id;
+}
+
+// Compare hiring candidates: (intelligence + discipline + charisma)
+function compareHiringCandidates(a: Person, b: Person): number {
+  const scoreA = a.intelligence + a.discipline + a.charisma;
+  const scoreB = b.intelligence + b.discipline + b.charisma;
+  if (scoreA !== scoreB) return scoreB - scoreA;
+  return a.id - b.id;
+}
+
+/**
+ * Fill hierarchy for a single company:
+ * - Promote from lower ranks into empty higher ranks
+ * - Hire into lowest rank roles from free agents in the same country
+ */
+async function fillIndustryHierarchyForCompany(companyId: number): Promise<void> {
+  await prisma.$transaction(async (tx) => {
+    const company = await tx.company.findUnique({
+      where: { id: companyId },
+      include: {
+        world: true,
+      },
+    });
+
+    if (!company) return;
+    const industry = company.industry;
+    const currentYear = company.world.currentYear;
+
+    const roles = await tx.industryRole.findMany({
+      where: { industry },
+      orderBy: { rank: 'asc' }, // 0 = top
+    });
+
+    if (roles.length === 0) return;
+
+    const positions = await tx.companyPosition.findMany({
+      where: { companyId: company.id },
+      include: {
+        person: true,
+        role: true,
+      },
+    });
+
+    type Slot = {
+      role: IndustryRole;
+      position: (CompanyPosition & { person: Person; role: IndustryRole }) | null;
+    };
+
+    const slots: Slot[] = roles.map((role) => {
+      const matches = positions.filter((p) => p.roleId === role.id);
+      let kept: (CompanyPosition & { person: Person; role: IndustryRole }) | null =
+        null;
+      if (matches.length > 0) {
+        kept = matches.slice().sort(comparePromotionCandidates)[0];
+      }
+      return { role, position: kept };
+    });
+
+    // ----- Promotion loop (top-down, repeat until stable) -----
+    let promotedSomething = true;
+    while (promotedSomething) {
+      promotedSomething = false;
+
+      for (let i = 0; i < slots.length; i++) {
+        const targetSlot = slots[i];
+        if (targetSlot.position) continue;
+
+        const lowerCandidates: (CompanyPosition & {
+          person: Person;
+          role: IndustryRole;
+        })[] = [];
+
+        for (let j = i + 1; j < slots.length; j++) {
+          const lowerSlot = slots[j];
+          if (lowerSlot.position) {
+            lowerCandidates.push(lowerSlot.position);
+          }
+        }
+
+        if (lowerCandidates.length === 0) continue;
+
+        const best = lowerCandidates.slice().sort(comparePromotionCandidates)[0];
+        const fromIndex = slots.findIndex(
+          (s) => s.position && s.position.id === best.id,
+        );
+        if (fromIndex === -1) continue;
+
+        const fromSlot = slots[fromIndex];
+
+        const updated = await tx.companyPosition.update({
+          where: { id: best.id },
+          data: { roleId: targetSlot.role.id },
+          include: {
+            person: true,
+            role: true,
+          },
+        });
+
+        // debug log
+        // eslint-disable-next-line no-console
+        console.log(
+          `[SIM][Company ${company.id}] PROMOTION: ${updated.person.name} from "${fromSlot.role.name}" -> "${targetSlot.role.name}"`,
+        );
+
+        targetSlot.position = updated;
+        fromSlot.position = null;
+        promotedSomething = true;
+      }
+    }
+
+    // ----- Hiring into lowest-rank roles -----
+    const maxRank = Math.max(...roles.map((r) => r.rank));
+    const bottomRoleIds = roles.filter((r) => r.rank === maxRank).map((r) => r.id);
+
+    const hasEmptyBottom = slots.some(
+      (s) => bottomRoleIds.includes(s.role.id) && !s.position,
+    );
+    if (!hasEmptyBottom) return;
+
+    let candidates = await tx.person.findMany({
+      where: {
+        worldId: company.worldId,
+        isAlive: true,
+        age: { gte: 18, lte: 65 },
+        countryId: company.countryId,
+        employments: {
+          none: {
+            endYear: null,
+          },
+        },
+        companyPositions: {
+          none: {},
+        },
+      },
+    });
+
+    candidates = candidates.slice().sort(compareHiringCandidates);
+
+    const getNextEmptyBottomSlotIndex = (): number =>
+      slots.findIndex(
+        (s) => bottomRoleIds.includes(s.role.id) && !s.position,
+      );
+
+    while (true) {
+      const bottomIndex = getNextEmptyBottomSlotIndex();
+      if (bottomIndex === -1) break;
+      if (candidates.length === 0) break;
+
+      const bestCandidate = candidates.shift()!;
+      const role = slots[bottomIndex].role;
+
+      const created = await tx.companyPosition.create({
+        data: {
+          companyId: company.id,
+          personId: bestCandidate.id,
+          roleId: role.id,
+          startYear: currentYear,
+          endYear: null,
+        },
+        include: {
+          person: true,
+          role: true,
+        },
+      });
+
+      // eslint-disable-next-line no-console
+      console.log(
+        `[SIM][Company ${company.id}] HIRE: ${created.person.name} into "${created.role.name}" (rank ${created.role.rank})`,
+      );
+
+      slots[bottomIndex].position = created;
+    }
+  });
+}
+
+/**
+ * Validation pass:
+ * - role.industry must match company.industry
+ * - at most one position per (companyId, roleId), keep best by intelligence
+ */
+async function validateCompanyPositions(): Promise<void> {
+  const positions = await prisma.companyPosition.findMany({
+    include: {
+      company: {
+        select: { id: true, industry: true },
+      },
+      role: {
+        select: { id: true, industry: true },
+      },
+      person: {
+        select: { id: true, intelligence: true },
+      },
+    },
+  });
+
+  const idsToDelete = new Set<number>();
+
+  // invalid industry
+  for (const pos of positions) {
+    if (pos.role.industry !== pos.company.industry) {
+      idsToDelete.add(pos.id);
+    }
+  }
+
+  // dedupe (companyId, roleId)
+  const byKey = new Map<string, typeof positions>();
+
+  for (const pos of positions) {
+    if (idsToDelete.has(pos.id)) continue;
+    const key = `${pos.companyId}-${pos.roleId}`;
+    if (!byKey.has(key)) byKey.set(key, []);
+    byKey.get(key)!.push(pos);
+  }
+
+  for (const [, group] of byKey.entries()) {
+    if (group.length <= 1) continue;
+
+    const sorted = group
+      .slice()
+      .sort(
+        (a, b) =>
+          b.person.intelligence - a.person.intelligence || a.id - b.id,
+      );
+    const keep = sorted[0];
+
+    for (let i = 1; i < sorted.length; i++) {
+      idsToDelete.add(sorted[i].id);
+    }
+
+    // eslint-disable-next-line no-console
+    console.log(
+      `[SIM] validateCompanyPositions: keeping person ${keep.person.id} for company ${keep.companyId}, role ${keep.roleId}, deleting ${sorted.length - 1} duplicates`,
+    );
+  }
+
+  if (idsToDelete.size > 0) {
+    await prisma.companyPosition.deleteMany({
+      where: { id: { in: Array.from(idsToDelete) } },
+    });
+  }
+}
+
+/**
+ * Convenience: run hierarchy maintenance for all companies in a world.
+ */
+async function fillIndustryHierarchiesForWorld(worldId: number): Promise<void> {
+  const companies = await prisma.company.findMany({
+    where: { worldId },
+    select: { id: true },
+  });
+
+  for (const { id } of companies) {
+    await fillIndustryHierarchyForCompany(id);
+  }
+}
+
+// ============================================================================
+// MAIN YEARLY SIM
+// ============================================================================
+
 export async function tickYear(worldId: number) {
   const world = await prisma.world.findUnique({
     where: { id: worldId },
@@ -254,7 +615,7 @@ export async function tickYear(worldId: number) {
     spouseMap.set(m.personBId, bList);
   }
 
-  // ---------- BIRTHS (inherit stats from parents + new potential/dev) ----------
+  // ---------- BIRTHS ----------
   const fertile = world.people.filter((p) => p.age >= 20 && p.age <= 40);
   const births: any[] = [];
 
@@ -333,7 +694,6 @@ export async function tickYear(worldId: number) {
       const babyPeakAge   = generatePeakAge(babyDevStyle);
       const babyPotential = generatePotentialOverall(babyOverall);
 
-      // Personality for newborn (required by schema)
       const { archetype: babyArchetype, subtype: babySubtype } =
         generatePersonalityFromStats(babyStats);
 
@@ -348,16 +708,13 @@ export async function tickYear(worldId: number) {
         parent1Id: parent1.id,
         parent2Id: parent2 ? parent2.id : null,
 
-        // potential & development
         potentialOverall: babyPotential,
         peakAge: babyPeakAge,
         developmentStyle: babyDevStyle,
 
-        // personality
         personalityArchetype: babyArchetype,
         personalitySubtype: babySubtype.label,
 
-        // stats
         ...babyStats,
       });
     }
@@ -365,7 +722,6 @@ export async function tickYear(worldId: number) {
 
   // ---------- EDUCATION + JOB + SOCIAL SYSTEMS ----------
 
-  // All schools in this world
   const schools = await prisma.school.findMany({
     where: { worldId },
   });
@@ -378,19 +734,17 @@ export async function tickYear(worldId: number) {
     schoolsByCountryLevel.set(key, arr);
   }
 
-  // People with jobs + enrollments
   const peopleFull = await prisma.person.findMany({
     where: { worldId },
     include: {
       country: true,
-      employments: true, // filter endYear === null in code
+      employments: true,
       enrollments: {
         include: { school: true },
       },
     },
   });
 
-  // Companies in this world
   const companies = await prisma.company.findMany({
     where: { worldId },
   });
@@ -402,10 +756,8 @@ export async function tickYear(worldId: number) {
     companiesByCountry.set(c.countryId, arr);
   }
 
-  // Friendships
   const friendships = await prisma.friendship.findMany({});
 
-  // Offices + existing terms
   const offices = await prisma.office.findMany({
     where: { worldId },
     include: { terms: true },
@@ -417,7 +769,7 @@ export async function tickYear(worldId: number) {
   const friendshipTxs: any[] = [];
   const officeTxs: any[] = [];
 
-  // ---------- MARRIAGE UPDATES: death + random divorce ----------
+  // ---------- MARRIAGE UPDATES ----------
   const endedMarriageIds = new Set<number>();
 
   for (const m of ongoingMarriages) {
@@ -461,7 +813,7 @@ export async function tickYear(worldId: number) {
     }
   }
 
-  // ---------- NEW MARRIAGES: pair unmarried adults by country ----------
+  // ---------- NEW MARRIAGES ----------
   const marriedIds = new Set<number>();
   for (const m of ongoingMarriages) {
     if (endedMarriageIds.has(m.id)) continue;
@@ -522,7 +874,7 @@ export async function tickYear(worldId: number) {
     );
   }
 
-  // ---------- ELECTIONS: offices & terms ----------
+  // ---------- ELECTIONS ----------
   for (const office of offices) {
     const currentTerm =
       office.terms.find((t) => t.endYear === null) || null;
@@ -532,7 +884,6 @@ export async function tickYear(worldId: number) {
 
     if (!needElection) continue;
 
-    // candidate pool: alive adults, leadership/charisma, scope by office
     const candidates = peopleFull.filter((p) => {
       const upd = updatedById.get(p.id);
       if (!upd || !upd.isAlive) return false;
@@ -541,8 +892,6 @@ export async function tickYear(worldId: number) {
       if (office.level === 'Country') {
         if (!office.countryId || p.countryId !== office.countryId) return false;
       }
-      // World level: any country is fine
-
       return true;
     });
 
@@ -557,7 +906,7 @@ export async function tickYear(worldId: number) {
       const score =
         0.6 * charisma +
         0.4 * leadership +
-        0.5 * prestige; // prestige makes repeat wins more likely
+        0.5 * prestige;
 
       return {
         person: p,
@@ -565,7 +914,6 @@ export async function tickYear(worldId: number) {
       };
     });
 
-    // weighted random winner
     const total = scored.reduce((sum, s) => sum + s.score, 0);
     let r = Math.random() * total;
     let winner = scored[0].person;
@@ -596,7 +944,6 @@ export async function tickYear(worldId: number) {
       }),
     );
 
-    // prestige + stat bump for winner (mutate updatedById entry)
     const updWinner = updatedById.get(winner.id);
     if (updWinner) {
       updWinner.charisma = clampStat(updWinner.charisma + 1);
@@ -858,7 +1205,6 @@ export async function tickYear(worldId: number) {
       data: { currentYear: newYear },
     }),
 
-    // Update every person explicitly with all stats
     ...updates.map((u) =>
       prisma.person.update({
         where: { id: u.id },
@@ -867,9 +1213,6 @@ export async function tickYear(worldId: number) {
           isAlive: u.isAlive,
           prestige: u.prestige,
 
-          // =========================
-          // Cognitive
-          // =========================
           intelligence: u.intelligence,
           memory: u.memory,
           creativity: u.creativity,
@@ -877,9 +1220,6 @@ export async function tickYear(worldId: number) {
           judgment: u.judgment,
           adaptability: u.adaptability,
 
-          // =========================
-          // Social / Influence
-          // =========================
           charisma: u.charisma,
           leadership: u.leadership,
           empathy: u.empathy,
@@ -887,9 +1227,6 @@ export async function tickYear(worldId: number) {
           confidence: u.confidence,
           negotiation: u.negotiation,
 
-          // =========================
-          // Physical
-          // =========================
           strength: u.strength,
           endurance: u.endurance,
           athleticism: u.athleticism,
@@ -897,9 +1234,6 @@ export async function tickYear(worldId: number) {
           reflexes: u.reflexes,
           appearance: u.appearance,
 
-          // =========================
-          // Personality
-          // =========================
           ambition: u.ambition,
           integrity: u.integrity,
           riskTaking: u.riskTaking,
@@ -910,7 +1244,6 @@ export async function tickYear(worldId: number) {
       }),
     ),
 
-    // Only add a createMany if there are births
     ...(births.length ? [prisma.person.createMany({ data: births })] : []),
 
     ...eduTxs,
@@ -919,6 +1252,11 @@ export async function tickYear(worldId: number) {
     ...officeTxs,
     ...jobTxs,
   ]);
+
+  // ---------- INDUSTRY HIERARCHY MAINTENANCE (v0) ----------
+  await cleanInvalidCompanyPositions();
+  await fillIndustryHierarchiesForWorld(worldId);
+  await validateCompanyPositions();
 
   return {
     newYear,
