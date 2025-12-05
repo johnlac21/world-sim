@@ -10,6 +10,7 @@ import {
   generatePeakAge,
   type DevStyle,
 } from './stats';
+import { generatePersonalityFromStats } from './personality';
 
 // --- random name helpers for births ---
 const FIRST = ['Lena', 'Kai', 'Mara', 'Jace', 'Noa', 'Theo', 'Iris', 'Ravi'];
@@ -332,6 +333,10 @@ export async function tickYear(worldId: number) {
       const babyPeakAge   = generatePeakAge(babyDevStyle);
       const babyPotential = generatePotentialOverall(babyOverall);
 
+      // Personality for newborn (required by schema)
+      const { archetype: babyArchetype, subtype: babySubtype } =
+        generatePersonalityFromStats(babyStats);
+
       births.push({
         worldId,
         countryId: parent1.countryId,
@@ -342,9 +347,17 @@ export async function tickYear(worldId: number) {
         isPlayer: false,
         parent1Id: parent1.id,
         parent2Id: parent2 ? parent2.id : null,
+
+        // potential & development
         potentialOverall: babyPotential,
         peakAge: babyPeakAge,
-        developmentStyle: babyDevStyle, // <-- plain string now
+        developmentStyle: babyDevStyle,
+
+        // personality
+        personalityArchetype: babyArchetype,
+        personalitySubtype: babySubtype.label,
+
+        // stats
         ...babyStats,
       });
     }
@@ -636,7 +649,7 @@ export async function tickYear(worldId: number) {
       continue;
     }
 
-    // EDUCATION progression (same as before)
+    // EDUCATION progression
     let stillEnrolled = currentEnrollment;
 
     if (currentEnrollment) {
