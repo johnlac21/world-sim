@@ -546,164 +546,6 @@ async function fillIndustryHierarchiesForWorld(worldId: number): Promise<void> {
 }
 
 // ============================================================================
-// COMPANY YEARLY PERFORMANCE (v0)
-// ============================================================================
-
-async function computeCompanyYearPerformance(
-  worldId: number,
-  year: number,
-): Promise<void> {
-  // All companies in this world
-  const companies = await prisma.company.findMany({
-    where: { worldId },
-  });
-
-  if (companies.length === 0) return;
-
-  const companyIds = companies.map((c) => c.id);
-
-  // All positions in these companies, with person + role so we know stats and rank
-  const positions = await prisma.companyPosition.findMany({
-    where: {
-      companyId: { in: companyIds },
-    },
-    include: {
-      person: true,
-      role: true,
-    },
-  });
-
-  // companyId -> positions[]
-  const positionsByCompany = new Map<number, any[]>();
-  for (const pos of positions) {
-    const arr = positionsByCompany.get(pos.companyId) ?? [];
-    arr.push(pos);
-    positionsByCompany.set(pos.companyId, arr);
-  }
-
-  // Component scores for a single person (based on their stats)
-  function computeComponents(p: Person) {
-    // Talent: mostly cognitive stats
-    const talent =
-      0.35 * p.intelligence +
-      0.2 * p.creativity +
-      0.2 * p.judgment +
-      0.15 * p.memory +
-      0.1 * p.adaptability;
-
-    // Leadership / influence
-    const leadership =
-      0.4 * p.leadership +
-      0.3 * p.charisma +
-      0.2 * p.communication +
-      0.1 * p.negotiation;
-
-    // Reliability / consistency
-    const reliability =
-      0.5 * p.discipline +
-      0.25 * p.integrity +
-      0.25 * p.stability;
-
-    return { talent, leadership, reliability };
-  }
-
-  // Tier multipliers by role rank (executives matter more)
-  function tierMultiplier(rank: number): number {
-    if (rank <= 1) return 1.4; // President / VP
-    if (rank <= 5) return 1.15; // managers / mid-tier
-    return 1.0; // workers / staff
-  }
-
-  const upserts: {
-    companyId: number;
-    worldId: number;
-    year: number;
-    talentScore: number;
-    leadershipScore: number;
-    reliabilityScore: number;
-    outputScore: number;
-  }[] = [];
-
-  for (const company of companies) {
-    const companyPositions = positionsByCompany.get(company.id) ?? [];
-
-    if (companyPositions.length === 0) {
-      // No one in the ladder → zero performance
-      upserts.push({
-        companyId: company.id,
-        worldId,
-        year,
-        talentScore: 0,
-        leadershipScore: 0,
-        reliabilityScore: 0,
-        outputScore: 0,
-      });
-      continue;
-    }
-
-    let talentSum = 0;
-    let leadershipSum = 0;
-    let reliabilitySum = 0;
-
-    for (const pos of companyPositions) {
-      const person: Person | null = pos.person;
-      const role: IndustryRole | null = pos.role;
-      if (!person || !role) continue;
-
-      const { talent, leadership, reliability } = computeComponents(person);
-      const mult = tierMultiplier(role.rank);
-
-      talentSum += talent * mult;
-      leadershipSum += leadership * mult;
-      reliabilitySum += reliability * mult;
-    }
-
-    const outputScore =
-      0.5 * talentSum + 0.3 * leadershipSum + 0.2 * reliabilitySum;
-
-    upserts.push({
-      companyId: company.id,
-      worldId,
-      year,
-      talentScore: talentSum,
-      leadershipScore: leadershipSum,
-      reliabilityScore: reliabilitySum,
-      outputScore,
-    });
-  }
-
-  // Upsert per (company, year)
-  await Promise.all(
-    upserts.map((row) =>
-      prisma.companyYearPerformance.upsert({
-        where: {
-          companyId_year: {
-            companyId: row.companyId,
-            year: row.year,
-          },
-        },
-        create: {
-          worldId: row.worldId,
-          companyId: row.companyId,
-          year: row.year,
-          talentScore: row.talentScore,
-          leadershipScore: row.leadershipScore,
-          reliabilityScore: row.reliabilityScore,
-          outputScore: row.outputScore,
-        },
-        update: {
-          talentScore: row.talentScore,
-          leadershipScore: row.leadershipScore,
-          reliabilityScore: row.reliabilityScore,
-          outputScore: row.outputScore,
-        },
-      }),
-    ),
-  );
-}
-
-
-// ============================================================================
 // MAIN YEARLY SIM
 // ============================================================================
 
@@ -1416,9 +1258,10 @@ export async function tickYear(worldId: number) {
   await fillIndustryHierarchiesForWorld(worldId);
   await validateCompanyPositions();
 
-  // ---------- COMPANY YEARLY PERFORMANCE (v0) ----------
+  // ---------- COMPANY YEARLY PERFORMANCE (v1) ----------
   await computeCompanyYearPerformance(worldId, newYear);
 
+  // (optional) return a small summary to the caller
   return {
     newYear,
     deaths: updates.filter((u) => !u.isAlive).length,
@@ -1426,4 +1269,190 @@ export async function tickYear(worldId: number) {
   };
 }
 
+// ============================================================================
+// COMPANY YEARLY PERFORMANCE (v1)
+// ============================================================================
+async function computeCompanyYearPerformance(
+  worldId: number,
+  year: number,
+): Promise<void> {
+  console.log('[PERF] computeCompanyYearPerformance start', { worldId, year });
 
+  // All companies in this world
+  const companies = await prisma.company.findMany({
+    where: { worldId },
+  });
+
+  console.log('[PERF] companies found', companies.length);
+
+  if (companies.length === 0) {
+    console.log('[PERF] no companies for world, skipping');
+    return;
+  }
+
+  const companyIds = companies.map((c) => c.id);
+
+  // All positions in these companies, with person + role so we know stats and rank
+  const positions = await prisma.companyPosition.findMany({
+    where: {
+      companyId: { in: companyIds },
+    },
+    include: {
+      person: true,
+      role: true,
+    },
+  });
+
+  type PositionWithJoins = (typeof positions)[number];
+
+  // companyId -> positions[]
+  const positionsByCompany = new Map<number, PositionWithJoins[]>();
+  for (const pos of positions) {
+    const arr = positionsByCompany.get(pos.companyId) ?? [];
+    arr.push(pos);
+    positionsByCompany.set(pos.companyId, arr);
+  }
+
+  // v1 role power: single aggregate metric per person
+  function rolePower(p: Person): number {
+    return (
+      0.35 * p.intelligence +
+      0.20 * p.discipline +
+      0.15 * p.leadership +
+      0.10 * p.charisma +
+      0.10 * p.judgment +
+      0.10 * p.adaptability
+    );
+  }
+
+  function average(values: number[]): number {
+    if (values.length === 0) return 0;
+    const sum = values.reduce((acc, v) => acc + v, 0);
+    return sum / values.length;
+  }
+
+  const upserts: {
+    companyId: number;
+    worldId: number;
+    year: number;
+    talentScore: number;
+    leadershipScore: number;
+    reliabilityScore: number;
+    outputScore: number;
+  }[] = [];
+
+  for (const company of companies) {
+    const companyPositions = positionsByCompany.get(company.id) ?? [];
+
+    if (companyPositions.length === 0) {
+      // No one in the ladder → zero performance
+      upserts.push({
+        companyId: company.id,
+        worldId,
+        year,
+        talentScore: 0,
+        leadershipScore: 0,
+        reliabilityScore: 0,
+        outputScore: 0,
+      });
+      continue;
+    }
+
+    const execPowers: number[] = [];
+    const managerPowers: number[] = [];
+    const contributorPowers: number[] = [];
+    const allPowers: number[] = [];
+
+    for (const pos of companyPositions) {
+      const person = pos.person as Person | null;
+      const role = pos.role as IndustryRole | null;
+      if (!person || !role) continue;
+
+      const power = rolePower(person);
+      allPowers.push(power);
+
+      if (role.rank <= 1) {
+        // President / VP (ranks 0–1)
+        execPowers.push(power);
+      } else if (role.rank >= 2 && role.rank <= 4) {
+        // Manager tier (ranks 2–4)
+        managerPowers.push(power);
+      } else if (role.rank >= 5 && role.rank <= 9) {
+        // Contributor tier (ranks 5–9)
+        contributorPowers.push(power);
+      }
+      // Ranks outside 0–9 are ignored for tiering, but still go into allPowers.
+    }
+
+    let execScore = average(execPowers);
+    let managerScore = average(managerPowers);
+    let contributorScore = average(contributorPowers);
+
+    // Fallback: if tier buckets ended up empty but the company *does* have positions,
+    // use overall average power so we don't silently get 0.0.
+    if (
+      execPowers.length === 0 &&
+      managerPowers.length === 0 &&
+      contributorPowers.length === 0 &&
+      allPowers.length > 0
+    ) {
+      const overall = average(allPowers);
+      execScore = overall;
+      managerScore = overall;
+      contributorScore = overall;
+    }
+
+    const outputScore =
+      0.5 * execScore + 0.3 * managerScore + 0.2 * contributorScore;
+
+    // Map v0 component fields to tier scores so they’re not meaningless:
+    // - talentScore      → execScore
+    // - leadershipScore  → managerScore
+    // - reliabilityScore → contributorScore
+    upserts.push({
+      companyId: company.id,
+      worldId,
+      year,
+      talentScore: execScore,
+      leadershipScore: managerScore,
+      reliabilityScore: contributorScore,
+      outputScore,
+    });
+  }
+
+
+  if (upserts.length === 0) {
+    console.log('[PERF] no rows to upsert, done');
+    return;
+  }
+
+  // Upsert per (company, year)
+  await Promise.all(
+    upserts.map((row) =>
+      prisma.companyYearPerformance.upsert({
+        where: {
+          companyId_year: {
+            companyId: row.companyId,
+            year: row.year,
+          },
+        },
+        create: {
+          worldId: row.worldId,
+          companyId: row.companyId,
+          year: row.year,
+          talentScore: row.talentScore,
+          leadershipScore: row.leadershipScore,
+          reliabilityScore: row.reliabilityScore,
+          outputScore: row.outputScore,
+        },
+        update: {
+          talentScore: row.talentScore,
+          leadershipScore: row.leadershipScore,
+          reliabilityScore: row.reliabilityScore,
+          outputScore: row.outputScore,
+        },
+      }),
+    ),
+  );
+
+}
