@@ -84,7 +84,16 @@ export default function CountryPage() {
         <p className="text-sm text-gray-600">
           World: {data.worldName}
         </p>
+        <p className="mt-1">
+          <Link
+            href={`/country/${id}/industry`}
+            className="text-sm text-blue-600 underline"
+          >
+            View Industry Structure →
+          </Link>
+        </p>
       </header>
+
 
       {data.offices.length === 0 ? (
         <p>No political offices defined for this country.</p>
