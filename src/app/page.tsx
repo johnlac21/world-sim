@@ -1,3 +1,4 @@
+// src/app/page.tsx (or wherever HomePage lives)
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -81,6 +82,16 @@ export default function HomePage() {
                 View global leaders →
               </Link>
             </p>
+            <p>
+              {world.id && (
+                <Link
+                  href={`/world/${world.id}/standings`}
+                  className="text-blue-600 underline"
+                >
+                  View national standings →
+                </Link>
+              )}
+            </p>
           </div>
         </div>
 
@@ -108,9 +119,12 @@ export default function HomePage() {
         <ul className="list-disc ml-5">
           {countries.map((c: any) => (
             <li key={c.id}>
-              <a href={`/country/${c.id}`} className="text-blue-600 underline">
+              <Link
+                href={`/country/${c.id}`}
+                className="text-blue-600 underline"
+              >
                 {c.name}
-              </a>
+              </Link>
             </li>
           ))}
         </ul>
@@ -121,9 +135,12 @@ export default function HomePage() {
         <ul className="list-disc ml-5">
           {samplePeople.map((p: any) => (
             <li key={p.id}>
-              <a href={`/person/${p.id}`} className="text-blue-600 underline">
+              <Link
+                href={`/person/${p.id}`}
+                className="text-blue-600 underline"
+              >
                 {p.name}
-              </a>{' '}
+              </Link>{' '}
               — age {p.age} — countryId {p.countryId}
               {!p.isAlive && ' (dead)'}
             </li>

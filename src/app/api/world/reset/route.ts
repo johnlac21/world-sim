@@ -38,7 +38,6 @@ const JOB_TITLES = [
 const SCHOOL_LEVELS = ['Primary', 'Secondary', 'University'] as const;
 
 // Local industry type for reset seeding.
-// Kept as a TS union, not a Prisma enum, so the DB column stays flexible.
 type IndustryType = 'TECH' | 'FINANCE' | 'RESEARCH';
 
 const INDUSTRIES: IndustryType[] = ['TECH', 'FINANCE', 'RESEARCH'];
@@ -140,6 +139,8 @@ export async function POST() {
     await prisma.enrollment.deleteMany();
     await prisma.employment.deleteMany();
     await prisma.companyPosition.deleteMany();
+    // NEW: clear yearly performance before deleting companies/world
+    await prisma.companyYearPerformance.deleteMany();
     await prisma.term.deleteMany();
     await prisma.school.deleteMany();
     await prisma.company.deleteMany();
@@ -439,8 +440,6 @@ export async function POST() {
     }
 
     // ----- COMPANY POSITIONS (INITIAL HIERARCHY SNAPSHOT) -----
-    // This seeds the hierarchy given current employees; yearly sim will
-    // maintain and refill it using promotion + hiring logic.
     const allIndustryRoles = await prisma.industryRole.findMany();
 
     for (const company of companies) {
@@ -456,7 +455,6 @@ export async function POST() {
       for (const role of rolesForIndustry) {
         if (availableEmployees.length === 0) break;
 
-        // Pick best candidate for this role based on roleRank-specific score.
         let bestIdx = 0;
         let bestScore = -Infinity;
 

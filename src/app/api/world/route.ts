@@ -1,13 +1,13 @@
 // app/api/world/route.ts
-import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
 
 export async function GET() {
   const world = await prisma.world.findFirst({
     include: {
       countries: true,
       people: {
-        orderBy: { id: "asc" },
+        orderBy: { id: 'asc' },
         take: 20,
       },
       companies: true,
@@ -15,7 +15,7 @@ export async function GET() {
   });
 
   if (!world) {
-    return NextResponse.json({ error: "World not found" }, { status: 404 });
+    return NextResponse.json({ error: 'World not found' }, { status: 404 });
   }
 
   // Total people in this world
@@ -40,17 +40,17 @@ export async function GET() {
 
   return NextResponse.json({
     // core world fields
-    id: world.id,
+    id: world.id,               // 👈 used by HomePage link /world/${id}/standings
     name: world.name,
     currentYear: world.currentYear,
     createdAt: world.createdAt,
 
-    // original relations
+    // relations (used by HomePage)
     countries: world.countries,
-    samplePeople: world.people, // <= 20 people, same as before but explicit
+    samplePeople: world.people, // <= 20 people, as a sample
     companies: world.companies,
 
-    // NEW: summary stats
+    // summary stats
     peopleCount: totalPeople,
     countriesCount: world.countries.length,
     companiesCount: world.companies.length,
