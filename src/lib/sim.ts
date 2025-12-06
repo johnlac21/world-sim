@@ -546,6 +546,164 @@ async function fillIndustryHierarchiesForWorld(worldId: number): Promise<void> {
 }
 
 // ============================================================================
+// COMPANY YEARLY PERFORMANCE (v0)
+// ============================================================================
+
+async function computeCompanyYearPerformance(
+  worldId: number,
+  year: number,
+): Promise<void> {
+  // All companies in this world
+  const companies = await prisma.company.findMany({
+    where: { worldId },
+  });
+
+  if (companies.length === 0) return;
+
+  const companyIds = companies.map((c) => c.id);
+
+  // All positions in these companies, with person + role so we know stats and rank
+  const positions = await prisma.companyPosition.findMany({
+    where: {
+      companyId: { in: companyIds },
+    },
+    include: {
+      person: true,
+      role: true,
+    },
+  });
+
+  // companyId -> positions[]
+  const positionsByCompany = new Map<number, any[]>();
+  for (const pos of positions) {
+    const arr = positionsByCompany.get(pos.companyId) ?? [];
+    arr.push(pos);
+    positionsByCompany.set(pos.companyId, arr);
+  }
+
+  // Component scores for a single person (based on their stats)
+  function computeComponents(p: Person) {
+    // Talent: mostly cognitive stats
+    const talent =
+      0.35 * p.intelligence +
+      0.2 * p.creativity +
+      0.2 * p.judgment +
+      0.15 * p.memory +
+      0.1 * p.adaptability;
+
+    // Leadership / influence
+    const leadership =
+      0.4 * p.leadership +
+      0.3 * p.charisma +
+      0.2 * p.communication +
+      0.1 * p.negotiation;
+
+    // Reliability / consistency
+    const reliability =
+      0.5 * p.discipline +
+      0.25 * p.integrity +
+      0.25 * p.stability;
+
+    return { talent, leadership, reliability };
+  }
+
+  // Tier multipliers by role rank (executives matter more)
+  function tierMultiplier(rank: number): number {
+    if (rank <= 1) return 1.4; // President / VP
+    if (rank <= 5) return 1.15; // managers / mid-tier
+    return 1.0; // workers / staff
+  }
+
+  const upserts: {
+    companyId: number;
+    worldId: number;
+    year: number;
+    talentScore: number;
+    leadershipScore: number;
+    reliabilityScore: number;
+    outputScore: number;
+  }[] = [];
+
+  for (const company of companies) {
+    const companyPositions = positionsByCompany.get(company.id) ?? [];
+
+    if (companyPositions.length === 0) {
+      // No one in the ladder → zero performance
+      upserts.push({
+        companyId: company.id,
+        worldId,
+        year,
+        talentScore: 0,
+        leadershipScore: 0,
+        reliabilityScore: 0,
+        outputScore: 0,
+      });
+      continue;
+    }
+
+    let talentSum = 0;
+    let leadershipSum = 0;
+    let reliabilitySum = 0;
+
+    for (const pos of companyPositions) {
+      const person: Person | null = pos.person;
+      const role: IndustryRole | null = pos.role;
+      if (!person || !role) continue;
+
+      const { talent, leadership, reliability } = computeComponents(person);
+      const mult = tierMultiplier(role.rank);
+
+      talentSum += talent * mult;
+      leadershipSum += leadership * mult;
+      reliabilitySum += reliability * mult;
+    }
+
+    const outputScore =
+      0.5 * talentSum + 0.3 * leadershipSum + 0.2 * reliabilitySum;
+
+    upserts.push({
+      companyId: company.id,
+      worldId,
+      year,
+      talentScore: talentSum,
+      leadershipScore: leadershipSum,
+      reliabilityScore: reliabilitySum,
+      outputScore,
+    });
+  }
+
+  // Upsert per (company, year)
+  await Promise.all(
+    upserts.map((row) =>
+      prisma.companyYearPerformance.upsert({
+        where: {
+          companyId_year: {
+            companyId: row.companyId,
+            year: row.year,
+          },
+        },
+        create: {
+          worldId: row.worldId,
+          companyId: row.companyId,
+          year: row.year,
+          talentScore: row.talentScore,
+          leadershipScore: row.leadershipScore,
+          reliabilityScore: row.reliabilityScore,
+          outputScore: row.outputScore,
+        },
+        update: {
+          talentScore: row.talentScore,
+          leadershipScore: row.leadershipScore,
+          reliabilityScore: row.reliabilityScore,
+          outputScore: row.outputScore,
+        },
+      }),
+    ),
+  );
+}
+
+
+// ============================================================================
 // MAIN YEARLY SIM
 // ============================================================================
 
@@ -1258,9 +1416,14 @@ export async function tickYear(worldId: number) {
   await fillIndustryHierarchiesForWorld(worldId);
   await validateCompanyPositions();
 
+  // ---------- COMPANY YEARLY PERFORMANCE (v0) ----------
+  await computeCompanyYearPerformance(worldId, newYear);
+
   return {
     newYear,
     deaths: updates.filter((u) => !u.isAlive).length,
     births: births.length,
   };
 }
+
+

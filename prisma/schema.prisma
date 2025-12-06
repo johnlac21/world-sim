@@ -20,6 +20,8 @@ model World {
   schools   School[]
   offices   Office[]
 
+  companyPerformances CompanyYearPerformance[]
+
   // One-to-one: which country the user controls
   controlledCountryId Int?     @unique
   controlledCountry   Country? @relation("ControlledCountry", fields: [controlledCountryId], references: [id])
@@ -161,6 +163,8 @@ model Company {
 
   // Industry hierarchy positions inside this company
   positions CompanyPosition[]
+
+  performances CompanyYearPerformance[]
 
   createdAt DateTime @default(now())
 }
@@ -317,4 +321,27 @@ model CompanyPosition {
   endYear   Int?
 
   createdAt DateTime @default(now())
+}
+
+model CompanyYearPerformance {
+  id Int @id @default(autoincrement())
+
+  world   World   @relation(fields: [worldId], references: [id])
+  worldId Int
+
+  company   Company @relation(fields: [companyId], references: [id])
+  companyId Int
+
+  // World year this performance is for
+  year Int
+
+  // v0 metrics
+  talentScore      Float
+  leadershipScore  Float
+  reliabilityScore Float
+  outputScore      Float
+
+  createdAt DateTime @default(now())
+
+  @@unique([companyId, year])
 }

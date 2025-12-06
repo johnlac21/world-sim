@@ -32,6 +32,8 @@ export async function GET(_req: Request, context: ParamsContext) {
     );
   }
 
+  const currentYear = country.world.currentYear;
+
   // All companies in this country
   const companies = await prisma.company.findMany({
     where: { countryId },
@@ -86,11 +88,29 @@ export async function GET(_req: Request, context: ParamsContext) {
       byRole = new Map();
       positionsByCompanyAndRole.set(pos.companyId, byRole);
     }
-    // validateCompanyPositions() should already prevent duplicates,
-    // but we defensively only keep the first.
     if (!byRole.has(pos.roleId)) {
       byRole.set(pos.roleId, pos);
     }
+  }
+
+  // Performance rows for current year
+  const performances =
+    companyIds.length === 0
+      ? []
+      : await prisma.companyYearPerformance.findMany({
+          where: {
+            companyId: { in: companyIds },
+            worldId: country.worldId,
+            year: currentYear,
+          },
+        });
+
+  const perfByCompanyId = new Map<
+    number,
+    (typeof performances)[number]
+  >();
+  for (const perf of performances) {
+    perfByCompanyId.set(perf.companyId, perf);
   }
 
   const industriesPayload = INDUSTRIES.map((industry) => {
@@ -136,17 +156,54 @@ export async function GET(_req: Request, context: ParamsContext) {
         };
       });
 
+      const perf = perfByCompanyId.get(company.id);
+
+      const performance = perf
+        ? {
+            year: perf.year,
+            talentScore: perf.talentScore,
+            leadershipScore: perf.leadershipScore,
+            reliabilityScore: perf.reliabilityScore,
+            outputScore: perf.outputScore,
+          }
+        : null;
+
       return {
         id: company.id,
         name: company.name,
         industry: company.industry,
         countryId: company.countryId,
         hierarchy,
+        performance,
       };
     });
 
+    // Aggregate for this industry in this country, current year
+    const companiesWithPerf = companiesPayload.filter(
+      (c) => c.performance !== null,
+    ) as (typeof companiesPayload)[number][];
+
+    const numCompaniesWithPerf = companiesWithPerf.length;
+    const totalOutputScore =
+      numCompaniesWithPerf === 0
+        ? 0
+        : companiesWithPerf.reduce(
+            (sum, c) => sum + (c.performance!.outputScore ?? 0),
+            0,
+          );
+    const averageOutputScore =
+      numCompaniesWithPerf === 0
+        ? null
+        : totalOutputScore / numCompaniesWithPerf;
+
     return {
       industry,
+      aggregate: {
+        year: currentYear,
+        numCompanies: numCompaniesWithPerf,
+        totalOutputScore,
+        averageOutputScore,
+      },
       companies: companiesPayload,
     };
   });
@@ -159,7 +216,7 @@ export async function GET(_req: Request, context: ParamsContext) {
     world: {
       id: country.worldId,
       name: country.world.name,
-      currentYear: country.world.currentYear,
+      currentYear,
     },
     industries: industriesPayload,
   });
