@@ -35,11 +35,32 @@ type CompanyHierarchyPayload = {
   hierarchy: HierarchyRole[];
 };
 
+// ---- Performance types ----
+
+type PerformanceRow = {
+  year: number;
+  talentScore: number;
+  leadershipScore: number;
+  reliabilityScore: number;
+  outputScore: number;
+};
+
+type CompanyPerformancePayload = {
+  company: CompanyInfo;
+  currentYear: number;
+  currentPerformance: PerformanceRow | null;
+  history: PerformanceRow[];
+};
+
 export default function CompanyPage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
 
-  const [data, setData] = useState<CompanyHierarchyPayload | null>(null);
+  const [hierarchyData, setHierarchyData] =
+    useState<CompanyHierarchyPayload | null>(null);
+  const [performanceData, setPerformanceData] =
+    useState<CompanyPerformancePayload | null>(null);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -51,16 +72,39 @@ export default function CompanyPage() {
         setLoading(true);
         setError(null);
 
-        const res = await fetch(`/api/company/${id}/hierarchy`);
-        if (!res.ok) {
-          const body = await res.json().catch(() => ({}));
-          throw new Error(body.error || `Request failed (${res.status})`);
+        const [hierarchyRes, perfRes] = await Promise.all([
+          fetch(`/api/company/${id}/hierarchy`),
+          fetch(`/api/company/${id}`),
+        ]);
+
+        if (!hierarchyRes.ok) {
+          const body = await hierarchyRes.json().catch(() => ({}));
+          throw new Error(
+            body.error ||
+              `Hierarchy request failed (${hierarchyRes.status})`,
+          );
         }
-        const json = (await res.json()) as CompanyHierarchyPayload;
-        setData(json);
+
+        if (!perfRes.ok) {
+          const body = await perfRes.json().catch(() => ({}));
+          throw new Error(
+            body.error || `Performance request failed (${perfRes.status})`,
+          );
+        }
+
+        const hierarchyJson =
+          (await hierarchyRes.json()) as CompanyHierarchyPayload;
+        const perfJson =
+          (await perfRes.json()) as CompanyPerformancePayload;
+
+        setHierarchyData(hierarchyJson);
+        setPerformanceData(perfJson);
       } catch (err: any) {
         console.error(err);
-        setError(err?.message ?? 'Failed to load company hierarchy');
+        setError(
+          err?.message ??
+            'Failed to load company hierarchy / performance',
+        );
       } finally {
         setLoading(false);
       }
@@ -73,7 +117,13 @@ export default function CompanyPage() {
     return <main className="p-4">Loading company…</main>;
   }
 
-  if (error || !data || (data as any).error) {
+  if (
+    error ||
+    !hierarchyData ||
+    (hierarchyData as any).error ||
+    !performanceData ||
+    (performanceData as any).error
+  ) {
     return (
       <main className="p-4 space-y-2">
         <p>Company not found or failed to load.</p>
@@ -84,12 +134,17 @@ export default function CompanyPage() {
     );
   }
 
-  const { company, hierarchy } = data;
+  const { company, hierarchy } = hierarchyData;
+  const {
+    currentYear,
+    currentPerformance,
+    history,
+  } = performanceData;
 
   return (
     <main className="flex flex-col md:flex-row">
       {/* MAIN CONTENT */}
-      <section className="flex-1 p-4 space-y-4 md:p-6">
+      <section className="flex-1 p-4 space-y-6 md:p-6">
         <header className="space-y-1">
           <Link href="/" className="text-blue-600 underline">
             ← Back to world
@@ -99,14 +154,115 @@ export default function CompanyPage() {
             Industry:{' '}
             <span className="font-medium">{company.industry}</span>
           </p>
+          <p className="text-xs text-gray-500">
+            World year: {currentYear}
+          </p>
         </header>
 
-        <section className="mt-4 space-y-2">
+        <section className="space-y-2">
           <h2 className="text-lg font-semibold">Company Overview</h2>
           <p className="text-sm text-gray-600">
-            This is a placeholder for company details (employees, performance,
-            etc.). The right-hand sidebar shows the current role hierarchy.
+            This page shows the company&apos;s current leadership hierarchy
+            in the sidebar and its simulated yearly performance below.
           </p>
+        </section>
+
+        {/* PERFORMANCE PANEL */}
+        <section className="border rounded-lg p-4 bg-white shadow-sm space-y-4">
+          <h2 className="text-lg font-semibold">Performance</h2>
+
+          {history.length === 0 ? (
+            <p className="text-sm text-gray-600">
+              No performance data yet — simulate a year to see results.
+            </p>
+          ) : (
+            <>
+              {/* Current-year summary */}
+              {currentPerformance ? (
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">
+                    Year {currentPerformance.year} performance:
+                    <span className="ml-1 text-base font-semibold">
+                      {currentPerformance.outputScore.toFixed(1)}
+                    </span>
+                  </p>
+                  <div className="grid grid-cols-3 gap-2 text-xs text-gray-700">
+                    <div>
+                      <div className="font-semibold">Talent</div>
+                      <div>{currentPerformance.talentScore.toFixed(1)}</div>
+                    </div>
+                    <div>
+                      <div className="font-semibold">Leadership</div>
+                      <div>
+                        {currentPerformance.leadershipScore.toFixed(1)}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="font-semibold">Reliability</div>
+                      <div>
+                        {currentPerformance.reliabilityScore.toFixed(1)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-gray-600">
+                  This company has historical performance but no record for
+                  year {currentYear} yet.
+                </p>
+              )}
+
+              {/* History table */}
+              <div className="pt-2">
+                <h3 className="text-sm font-medium mb-2">History</h3>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-xs border border-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-2 py-1 text-left border-b">
+                          Year
+                        </th>
+                        <th className="px-2 py-1 text-right border-b">
+                          Output
+                        </th>
+                        <th className="px-2 py-1 text-right border-b">
+                          Talent
+                        </th>
+                        <th className="px-2 py-1 text-right border-b">
+                          Leadership
+                        </th>
+                        <th className="px-2 py-1 text-right border-b">
+                          Reliability
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {history.map((row) => (
+                        <tr
+                          key={row.year}
+                          className="odd:bg-white even:bg-gray-50"
+                        >
+                          <td className="px-2 py-1 border-b">{row.year}</td>
+                          <td className="px-2 py-1 text-right border-b">
+                            {row.outputScore.toFixed(1)}
+                          </td>
+                          <td className="px-2 py-1 text-right border-b">
+                            {row.talentScore.toFixed(1)}
+                          </td>
+                          <td className="px-2 py-1 text-right border-b">
+                            {row.leadershipScore.toFixed(1)}
+                          </td>
+                          <td className="px-2 py-1 text-right border-b">
+                            {row.reliabilityScore.toFixed(1)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          )}
         </section>
       </section>
 
