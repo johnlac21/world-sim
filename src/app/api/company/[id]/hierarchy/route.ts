@@ -58,7 +58,7 @@ export async function GET(
       outputScore: row.outputScore,
     }));
 
-  // --- Industry benchmark (v1) ---
+  // --- Industry benchmark + peers (v1) ---
   let industryBenchmark: {
     year: number | null;
     companyOutput: number | null;
@@ -66,6 +66,17 @@ export async function GET(
     industryRank: number | null;
     totalCompanies: number;
   };
+
+  let industryPeers:
+    | {
+        companyId: number;
+        companyName: string;
+        countryId: number;
+        countryName: string;
+        outputScore: number;
+        rank: number;
+        isThisCompany: boolean;
+      }[] = [];
 
   if (!latestPerformance) {
     // No performance yet for this company
@@ -86,6 +97,13 @@ export async function GET(
           industry: company.industry,
         },
       },
+      include: {
+        company: {
+          include: {
+            country: true,
+          },
+        },
+      },
     });
 
     const totalCompanies = rows.length;
@@ -99,13 +117,13 @@ export async function GET(
         totalCompanies: 0,
       };
     } else {
-      const industryAverage =
-        rows.reduce((sum, r) => sum + r.outputScore, 0) /
-        totalCompanies;
-
       const sorted = [...rows].sort(
         (a, b) => b.outputScore - a.outputScore,
       );
+
+      const industryAverage =
+        sorted.reduce((sum, r) => sum + r.outputScore, 0) /
+        totalCompanies;
 
       const idx = sorted.findIndex((r) => r.companyId === company.id);
       const rank = idx === -1 ? null : idx + 1; // 1-based rank
@@ -117,6 +135,16 @@ export async function GET(
         industryRank: rank,
         totalCompanies,
       };
+
+      industryPeers = sorted.map((row, index) => ({
+        companyId: row.companyId,
+        companyName: row.company.name,
+        countryId: row.company.countryId,
+        countryName: row.company.country.name,
+        outputScore: row.outputScore,
+        rank: index + 1,
+        isThisCompany: row.companyId === company.id,
+      }));
     }
   }
 
@@ -186,6 +214,7 @@ export async function GET(
     hierarchy,
     latestPerformance,   // single latest year (or null)
     performanceHistory,  // 0–10 rows, ascending by year
-    industryBenchmark,   // comparison vs industry peers
+    industryBenchmark,   // comparison vs industry peers (aggregate)
+    industryPeers,       // full ranked list of peers
   });
 }

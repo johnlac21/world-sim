@@ -55,12 +55,23 @@ type IndustryBenchmark = {
   totalCompanies: number;
 };
 
+type IndustryPeer = {
+  companyId: number;
+  companyName: string;
+  countryId: number;
+  countryName: string;
+  outputScore: number;
+  rank: number;
+  isThisCompany: boolean;
+};
+
 type CompanyHierarchyPayload = {
   company: CompanyInfo;
   hierarchy: HierarchyRole[];
   latestPerformance: LatestPerformance;
   performanceHistory: PerformanceRow[];
   industryBenchmark: IndustryBenchmark;
+  industryPeers: IndustryPeer[];
 };
 
 export default function CompanyPage() {
@@ -125,6 +136,7 @@ export default function CompanyPage() {
     latestPerformance,
     performanceHistory,
     industryBenchmark,
+    industryPeers,
   } = data;
 
   // For history chart
@@ -141,6 +153,9 @@ export default function CompanyPage() {
     industryBenchmark.companyOutput !== null &&
     industryBenchmark.industryAverage !== null &&
     industryBenchmark.totalCompanies > 0;
+
+  const hasPeers = industryPeers.length > 0;
+  const peersYear = latestPerformance?.year ?? industryBenchmark.year ?? null;
 
   return (
     <main className="flex flex-col md:flex-row">
@@ -256,6 +271,68 @@ export default function CompanyPage() {
                   industry.
                 </p>
               )}
+            </div>
+          )}
+        </section>
+
+        {/* INDUSTRY PEERS PANEL */}
+        <section className="border border-gray-200 rounded-lg bg-gray-50 p-4 shadow-sm space-y-3">
+          <div className="flex items-baseline justify-between">
+            <h2 className="text-lg font-semibold">Industry Peers</h2>
+            {hasPeers && peersYear !== null && (
+              <p className="text-xs text-gray-500">
+                Year {peersYear} — {industryPeers.length} companies
+              </p>
+            )}
+          </div>
+
+          {!hasPeers ? (
+            <p className="text-sm text-gray-600">
+              No peer data yet — simulate a year to see other companies in
+              this industry.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-xs">
+                <thead className="border-b border-gray-200 text-gray-500">
+                  <tr>
+                    <th className="py-1 pr-3 text-left">Rank</th>
+                    <th className="py-1 pr-3 text-left">Company</th>
+                    <th className="py-1 pr-3 text-left">Country</th>
+                    <th className="py-1 text-right">Output</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {industryPeers.map((peer) => {
+                    const isSelf = peer.isThisCompany;
+                    return (
+                      <tr
+                        key={peer.companyId}
+                        className={
+                          'border-b border-gray-100' +
+                          (isSelf ? ' bg-blue-50/70 font-medium' : '')
+                        }
+                      >
+                        <td className="py-1 pr-3">{peer.rank}</td>
+                        <td className="py-1 pr-3">
+                          {peer.companyName}
+                          {isSelf && (
+                            <span className="ml-1 text-[10px] text-blue-600">
+                              (you)
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-1 pr-3 text-gray-700">
+                          {peer.countryName}
+                        </td>
+                        <td className="py-1 text-right font-mono">
+                          {peer.outputScore.toFixed(1)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
         </section>
