@@ -58,6 +58,68 @@ export async function GET(
       outputScore: row.outputScore,
     }));
 
+  // --- Industry benchmark (v1) ---
+  let industryBenchmark: {
+    year: number | null;
+    companyOutput: number | null;
+    industryAverage: number | null;
+    industryRank: number | null;
+    totalCompanies: number;
+  };
+
+  if (!latestPerformance) {
+    // No performance yet for this company
+    industryBenchmark = {
+      year: null,
+      companyOutput: null,
+      industryAverage: null,
+      industryRank: null,
+      totalCompanies: 0,
+    };
+  } else {
+    // All companies in the same world + industry + year
+    const rows = await prisma.companyYearPerformance.findMany({
+      where: {
+        worldId: company.worldId,
+        year: latestPerformance.year,
+        company: {
+          industry: company.industry,
+        },
+      },
+    });
+
+    const totalCompanies = rows.length;
+
+    if (totalCompanies === 0) {
+      industryBenchmark = {
+        year: null,
+        companyOutput: null,
+        industryAverage: null,
+        industryRank: null,
+        totalCompanies: 0,
+      };
+    } else {
+      const industryAverage =
+        rows.reduce((sum, r) => sum + r.outputScore, 0) /
+        totalCompanies;
+
+      const sorted = [...rows].sort(
+        (a, b) => b.outputScore - a.outputScore,
+      );
+
+      const idx = sorted.findIndex((r) => r.companyId === company.id);
+      const rank = idx === -1 ? null : idx + 1; // 1-based rank
+
+      industryBenchmark = {
+        year: latestPerformance.year,
+        companyOutput: latestPerformance.outputScore,
+        industryAverage,
+        industryRank: rank,
+        totalCompanies,
+      };
+    }
+  }
+
   // Roles for this company's industry
   const roles = await prisma.industryRole.findMany({
     where: { industry: company.industry },
@@ -122,7 +184,8 @@ export async function GET(
       worldId: company.worldId, // for "View in Standings" link
     },
     hierarchy,
-    latestPerformance,      // single latest year (or null)
-    performanceHistory,     // 0–10 rows, ascending by year
+    latestPerformance,   // single latest year (or null)
+    performanceHistory,  // 0–10 rows, ascending by year
+    industryBenchmark,   // comparison vs industry peers
   });
 }

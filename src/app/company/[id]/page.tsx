@@ -47,11 +47,20 @@ type PerformanceRow = {
   outputScore: number;
 };
 
+type IndustryBenchmark = {
+  year: number | null;
+  companyOutput: number | null;
+  industryAverage: number | null;
+  industryRank: number | null;
+  totalCompanies: number;
+};
+
 type CompanyHierarchyPayload = {
   company: CompanyInfo;
   hierarchy: HierarchyRole[];
   latestPerformance: LatestPerformance;
   performanceHistory: PerformanceRow[];
+  industryBenchmark: IndustryBenchmark;
 };
 
 export default function CompanyPage() {
@@ -110,17 +119,28 @@ export default function CompanyPage() {
     );
   }
 
-  const { company, hierarchy, latestPerformance, performanceHistory } = data;
+  const {
+    company,
+    hierarchy,
+    latestPerformance,
+    performanceHistory,
+    industryBenchmark,
+  } = data;
 
   // For history chart
   const historyCount = performanceHistory.length;
   const hasHistoryTrend = historyCount >= 2;
-const outputs = performanceHistory
-  .map((p) => p.outputScore)
-  .filter((v) => Number.isFinite(v));
+  const outputs = performanceHistory
+    .map((p) => p.outputScore)
+    .filter((v) => Number.isFinite(v));
 
-const maxOutput =
-  outputs.length > 0 ? Math.max(...outputs) : 0;
+  const maxOutput = outputs.length > 0 ? Math.max(...outputs) : 0;
+
+  const showBenchmark =
+    industryBenchmark.year !== null &&
+    industryBenchmark.companyOutput !== null &&
+    industryBenchmark.industryAverage !== null &&
+    industryBenchmark.totalCompanies > 0;
 
   return (
     <main className="flex flex-col md:flex-row">
@@ -203,60 +223,96 @@ const maxOutput =
           </div>
         </section>
 
-{/* PERFORMANCE HISTORY PANEL */}
-<section className="border border-gray-200 rounded-lg bg-gray-50 p-4 shadow-sm space-y-3">
-  <div className="flex items-baseline justify-between">
-    <h2 className="text-lg font-semibold">Performance History</h2>
-    {historyCount > 0 && (
-      <p className="text-xs text-gray-500">
-        Last {historyCount} year{historyCount === 1 ? '' : 's'}
-      </p>
-    )}
-  </div>
+        {/* INDUSTRY BENCHMARK PANEL */}
+        <section className="border border-gray-200 rounded-lg bg-gray-50 p-4 shadow-sm space-y-3">
+          <h2 className="text-lg font-semibold">Industry Benchmark</h2>
 
-  {historyCount === 0 || !hasHistoryTrend ? (
-    <p className="text-sm text-gray-600">
-      Not enough history yet — simulate more years to see a
-      performance trend.
-    </p>
-  ) : (
-    <div className="mt-1">
-      {/* fixed chart height in px */}
-      <div className="flex items-end gap-2" style={{ height: 120 }}>
-        {performanceHistory.map((row) => {
-          // make sure the value is usable
-          const rawOutput = Number.isFinite(row.outputScore)
-            ? row.outputScore
-            : 0;
+          {!showBenchmark ? (
+            <p className="text-sm text-gray-600">
+              No benchmark data yet — simulate a year to compare this company
+              to its industry.
+            </p>
+          ) : (
+            <div className="space-y-2 text-sm text-gray-700">
+              <p className="font-medium">
+                Year {industryBenchmark.year} — {company.industry}
+              </p>
+              <p>
+                This company:{' '}
+                <span className="font-mono font-semibold">
+                  {industryBenchmark.companyOutput!.toFixed(1)}
+                </span>
+              </p>
+              <p>
+                Industry average:{' '}
+                <span className="font-mono">
+                  {industryBenchmark.industryAverage!.toFixed(1)}
+                </span>
+              </p>
+              {industryBenchmark.industryRank && (
+                <p className="text-xs text-gray-600">
+                  Rank {industryBenchmark.industryRank} of{' '}
+                  {industryBenchmark.totalCompanies} companies in this
+                  industry.
+                </p>
+              )}
+            </div>
+          )}
+        </section>
 
-          // compute a bar height in px, with a minimum so it's visible
-          const max = maxOutput > 0 ? maxOutput : rawOutput || 1;
-          let barHeight = Math.round((rawOutput / max) * 110); // <= 110px
+        {/* PERFORMANCE HISTORY PANEL */}
+        <section className="border border-gray-200 rounded-lg bg-gray-50 p-4 shadow-sm space-y-3">
+          <div className="flex items-baseline justify-between">
+            <h2 className="text-lg font-semibold">Performance History</h2>
+            {historyCount > 0 && (
+              <p className="text-xs text-gray-500">
+                Last {historyCount} year{historyCount === 1 ? '' : 's'}
+              </p>
+            )}
+          </div>
 
-          if (barHeight > 0 && barHeight < 8) barHeight = 8; // min visible
-          if (barHeight < 0) barHeight = 0;
+          {historyCount === 0 || !hasHistoryTrend ? (
+            <p className="text-sm text-gray-600">
+              Not enough history yet — simulate more years to see a
+              performance trend.
+            </p>
+          ) : (
+            <div className="mt-1">
+              {/* fixed chart height in px */}
+              <div className="flex items-end gap-2" style={{ height: 120 }}>
+                {performanceHistory.map((row) => {
+                  const rawOutput = Number.isFinite(row.outputScore)
+                    ? row.outputScore
+                    : 0;
 
-          return (
-            <div
-              key={row.year}
-              className="flex flex-col items-center flex-1"
-            >
-              <div
-                className="w-3 rounded-t bg-blue-500"
-                style={{ height: barHeight }}
-                aria-label={`Year ${row.year} output ${rawOutput.toFixed(1)}`}
-              />
-              <div className="mt-1 text-[10px] text-gray-600">
-                Y{row.year}
+                  const max = maxOutput > 0 ? maxOutput : rawOutput || 1;
+                  let barHeight = Math.round((rawOutput / max) * 110); // <=110px
+
+                  if (barHeight > 0 && barHeight < 8) barHeight = 8;
+                  if (barHeight < 0) barHeight = 0;
+
+                  return (
+                    <div
+                      key={row.year}
+                      className="flex flex-col items-center flex-1"
+                    >
+                      <div
+                        className="w-3 rounded-t bg-blue-500"
+                        style={{ height: barHeight }}
+                        aria-label={`Year ${row.year} output ${rawOutput.toFixed(
+                          1,
+                        )}`}
+                      />
+                      <div className="mt-1 text-[10px] text-gray-600">
+                        Y{row.year}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
-          );
-        })}
-      </div>
-    </div>
-  )}
-</section>
-
+          )}
+        </section>
       </section>
 
       {/* SIDEBAR: HIERARCHY */}
