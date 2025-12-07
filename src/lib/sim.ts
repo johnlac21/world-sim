@@ -92,7 +92,6 @@ function computeLeaderRating(person: {
   return clamped;
 }
 
-
 // simple normal noise generator for dev
 function normalNoise(sd: number): number {
   if (sd <= 0) return 0;
@@ -211,7 +210,7 @@ function applyYearlyDevelopment(person: Person, newAge: number): PersonStats {
 }
 
 // ============================================================================
-// INDUSTRY HIERARCHY LOGIC (v0)
+// INDUSTRY HIERARCHY LOGIC (v0 + locked slots)
 // ============================================================================
 
 /**
@@ -220,6 +219,8 @@ function applyYearlyDevelopment(person: Person, newAge: number): PersonStats {
  * - person.countryId !== company.countryId
  * - role.industry !== company.industry
  * - no active Employment at that company
+ *
+ * NOTE: This may delete even locked rows if they are logically invalid.
  */
 async function cleanInvalidCompanyPositions(): Promise<void> {
   const positions = await prisma.companyPosition.findMany({
@@ -319,7 +320,7 @@ function compareHiringCandidates(a: Person, b: Person): number {
 
 /**
  * Fill hierarchy for a single company:
- * - Promote from lower ranks into empty higher ranks
+ * - Promote from lower ranks into empty higher ranks (but never out of locked slots)
  * - Hire into lowest rank roles from free agents in the same country
  */
 async function fillIndustryHierarchyForCompany(companyId: number): Promise<void> {
@@ -352,16 +353,26 @@ async function fillIndustryHierarchyForCompany(companyId: number): Promise<void>
 
     type Slot = {
       role: IndustryRole;
-      position: (CompanyPosition & { person: Person; role: IndustryRole }) | null;
+      position: (CompanyPosition & {
+        person: Person;
+        role: IndustryRole;
+      }) | null;
     };
 
+    // For each role, prefer a locked position if any exist; otherwise best by promotion criteria.
     const slots: Slot[] = roles.map((role) => {
       const matches = positions.filter((p) => p.roleId === role.id);
-      let kept: (CompanyPosition & { person: Person; role: IndustryRole }) | null =
-        null;
+      let kept: (CompanyPosition & {
+        person: Person;
+        role: IndustryRole;
+      }) | null = null;
+
       if (matches.length > 0) {
-        kept = matches.slice().sort(comparePromotionCandidates)[0];
+        const lockedMatches = matches.filter((m) => m.locked);
+        const pool = lockedMatches.length > 0 ? lockedMatches : matches;
+        kept = pool.slice().sort(comparePromotionCandidates)[0];
       }
+
       return { role, position: kept };
     });
 
@@ -372,8 +383,9 @@ async function fillIndustryHierarchyForCompany(companyId: number): Promise<void>
 
       for (let i = 0; i < slots.length; i++) {
         const targetSlot = slots[i];
-        if (targetSlot.position) continue;
+        if (targetSlot.position) continue; // already filled
 
+        // Collect promotion candidates from lower, NON-LOCKED slots
         const lowerCandidates: (CompanyPosition & {
           person: Person;
           role: IndustryRole;
@@ -381,7 +393,7 @@ async function fillIndustryHierarchyForCompany(companyId: number): Promise<void>
 
         for (let j = i + 1; j < slots.length; j++) {
           const lowerSlot = slots[j];
-          if (lowerSlot.position) {
+          if (lowerSlot.position && !lowerSlot.position.locked) {
             lowerCandidates.push(lowerSlot.position);
           }
         }
@@ -405,7 +417,6 @@ async function fillIndustryHierarchyForCompany(companyId: number): Promise<void>
           },
         });
 
-        // debug log
         // eslint-disable-next-line no-console
         console.log(
           `[SIM][Company ${company.id}] PROMOTION: ${updated.person.name} from "${fromSlot.role.name}" -> "${targetSlot.role.name}"`,
@@ -485,7 +496,7 @@ async function fillIndustryHierarchyForCompany(companyId: number): Promise<void>
 /**
  * Validation pass:
  * - role.industry must match company.industry
- * - at most one position per (companyId, roleId), keep best by intelligence
+ * - at most one position per (companyId, roleId), prefer locked rows, keep best by intelligence
  */
 async function validateCompanyPositions(): Promise<void> {
   const positions = await prisma.companyPosition.findMany({
@@ -511,7 +522,7 @@ async function validateCompanyPositions(): Promise<void> {
     }
   }
 
-  // dedupe (companyId, roleId)
+  // dedupe (companyId, roleId), preferring locked if present
   const byKey = new Map<string, typeof positions>();
 
   for (const pos of positions) {
@@ -524,7 +535,10 @@ async function validateCompanyPositions(): Promise<void> {
   for (const [, group] of byKey.entries()) {
     if (group.length <= 1) continue;
 
-    const sorted = group
+    const lockedGroup = group.filter((g) => g.locked);
+    const pool = lockedGroup.length > 0 ? lockedGroup : group;
+
+    const sorted = pool
       .slice()
       .sort(
         (a, b) =>
@@ -532,13 +546,14 @@ async function validateCompanyPositions(): Promise<void> {
       );
     const keep = sorted[0];
 
-    for (let i = 1; i < sorted.length; i++) {
-      idsToDelete.add(sorted[i].id);
+    for (const pos of group) {
+      if (pos.id === keep.id) continue;
+      idsToDelete.add(pos.id);
     }
 
     // eslint-disable-next-line no-console
     console.log(
-      `[SIM] validateCompanyPositions: keeping person ${keep.person.id} for company ${keep.companyId}, role ${keep.roleId}, deleting ${sorted.length - 1} duplicates`,
+      `[SIM] validateCompanyPositions: keeping person ${keep.person.id} for company ${keep.companyId}, role ${keep.roleId}, deleting ${group.length - 1} duplicates`,
     );
   }
 
@@ -978,7 +993,6 @@ export async function tickYear(worldId: number) {
     }
   }
 
-
   // ---------- PER-PERSON: education + jobs ----------
   for (const person of peopleFull) {
     const upd = updatedById.get(person.id);
@@ -1278,15 +1292,15 @@ export async function tickYear(worldId: number) {
     ...jobTxs,
   ]);
 
-  // ---------- INDUSTRY HIERARCHY MAINTENANCE (v0) ----------
+  // ---------- INDUSTRY HIERARCHY MAINTENANCE ----------
   await cleanInvalidCompanyPositions();
   await fillIndustryHierarchiesForWorld(worldId);
   await validateCompanyPositions();
 
-  // ---------- COMPANY YEARLY PERFORMANCE (v1) ----------
+  // ---------- COMPANY YEARLY PERFORMANCE ----------
   await computeCompanyYearPerformance(worldId, newYear);
 
-  // ---------- COUNTRY YEARLY PERFORMANCE (v1) ----------
+  // ---------- COUNTRY YEARLY PERFORMANCE ----------
   await computeCountryYearPerformance(worldId, newYear);
 
   // (optional) return a small summary to the caller
@@ -1482,6 +1496,7 @@ async function computeCompanyYearPerformance(
     ),
   );
 }
+
 // How strongly governmentScore affects country totalScore.
 // Interpreted as: each point of gov score (0–100) is worth this many "output" points.
 const GOVERNMENT_SCORE_WEIGHT = 5;
@@ -1550,7 +1565,6 @@ async function computeGovernmentScoreForCountryYear(
 
   return clamped;
 }
-
 
 // ============================================================================
 // COUNTRY YEARLY PERFORMANCE (v1)
@@ -1640,7 +1654,6 @@ async function computeCountryYearPerformance(
   await prisma.countryYearPerformance.createMany({
     data: rowsToInsert,
   });
-
 
   // Now select champion for this world/year
   const rows = await prisma.countryYearPerformance.findMany({

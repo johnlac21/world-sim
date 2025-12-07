@@ -325,6 +325,8 @@ model CompanyPosition {
   startYear Int
   endYear   Int?
 
+  locked Boolean @default(false)
+
   createdAt DateTime @default(now())
 }
 

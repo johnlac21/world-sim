@@ -28,6 +28,13 @@ export async function GET(
     );
   }
 
+  // One-world assumption, same as other player APIs
+  const world = await prisma.world.findFirst();
+
+  const isEditable =
+    world?.controlledCountryId != null &&
+    world.controlledCountryId === company.countryId;
+
   // --- Performance rows (used for latest + history) ---
   const perfRowsDesc = await prisma.companyYearPerformance.findMany({
     where: { companyId },
@@ -179,6 +186,7 @@ export async function GET(
         roleName: role.name,
         rank: role.rank,
         occupied: false,
+        locked: false, // no position row -> not locked
         person: null as null,
       };
     }
@@ -190,6 +198,7 @@ export async function GET(
       roleName: role.name,
       rank: role.rank,
       occupied: true,
+      locked: pos.locked,
       person: {
         id: person.id,
         name: person.name,
@@ -211,10 +220,11 @@ export async function GET(
       countryId: company.countryId,
       worldId: company.worldId, // for "View in Standings" link
     },
+    isEditable,             // NEW: can the player edit this hierarchy?
     hierarchy,
-    latestPerformance,   // single latest year (or null)
-    performanceHistory,  // 0–10 rows, ascending by year
-    industryBenchmark,   // comparison vs industry peers (aggregate)
-    industryPeers,       // full ranked list of peers
+    latestPerformance,      // single latest year (or null)
+    performanceHistory,     // 0–10 rows, ascending by year
+    industryBenchmark,      // comparison vs industry peers (aggregate)
+    industryPeers,          // full ranked list of peers
   });
 }
