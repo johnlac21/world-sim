@@ -30,6 +30,16 @@ type CountryPerformanceSummary = {
   topCompanies: TopCompanyRow[];
 };
 
+type GovernmentOfficeRow = {
+  id: number;
+  name: string;
+  prestige: number;
+  holderId: number | null;
+  holderName: string | null;
+  fitScore: number | null; // 0–100 if holder exists
+  termYearsRemaining: number | null; // null if unknown
+};
+
 type PlayerCountryPayload = {
   name: string;
   worldName: string;
@@ -38,11 +48,7 @@ type PlayerCountryPayload = {
   schools: number;
   employed: number;
   unemployed: number;
-  offices: {
-    id: number;
-    name: string;
-    currentHolder: string | null;
-  }[];
+  offices: GovernmentOfficeRow[];
   // New: optional performance summary
   performance?: CountryPerformanceSummary | null;
 };
@@ -73,6 +79,16 @@ export default function PlayerCountryPage() {
 
   const perf = data.performance ?? null;
 
+  const formatFitScore = (score: number | null) =>
+    score == null ? '—' : `${Math.round(score)}/100`;
+
+  const formatTermRemaining = (termYearsRemaining: number | null) => {
+    if (termYearsRemaining == null) return '—';
+    if (termYearsRemaining <= 0) return 'Term ending';
+    if (termYearsRemaining === 1) return '1 year left';
+    return `${termYearsRemaining} years left`;
+  };
+
   return (
     <main className="p-4 space-y-6">
       <header className="space-y-1">
@@ -92,7 +108,76 @@ export default function PlayerCountryPage() {
         </ul>
       </section>
 
-      {/* Country performance panel (NEW) */}
+      {/* Government overview card (NEW) */}
+      <section className="border rounded-lg p-4 bg-white shadow-sm space-y-4">
+        <div className="flex items-baseline justify-between">
+          <h2 className="text-xl font-semibold">Government</h2>
+          <span className="text-xs text-gray-500">
+            Key offices &amp; leadership quality
+          </span>
+        </div>
+
+        {data.offices.length === 0 ? (
+          <p className="text-sm text-gray-600">
+            No government offices defined for this country yet.
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm border border-gray-200">
+              <thead className="bg-gray-50 text-xs uppercase text-gray-500">
+                <tr>
+                  <th className="px-2 py-1 text-left border-b">Office</th>
+                  <th className="px-2 py-1 text-left border-b">Holder</th>
+                  <th className="px-2 py-1 text-right border-b">Fit</th>
+                  <th className="px-2 py-1 text-right border-b">Term</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.offices.map((o) => (
+                  <tr
+                    key={o.id}
+                    className="odd:bg-white even:bg-gray-50 border-b last:border-0"
+                  >
+                    <td className="px-2 py-1 align-top">
+                      <Link
+                        href={`/office/${o.id}`}
+                        className="font-medium text-blue-600 hover:underline"
+                      >
+                        {o.name}
+                      </Link>
+                      {o.prestige > 0 && (
+                        <span className="ml-1 text-xs text-gray-400">
+                          (Prestige {o.prestige})
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-2 py-1 align-top">
+                      {o.holderId && o.holderName ? (
+                        <Link
+                          href={`/person/${o.holderId}`}
+                          className="text-blue-600 hover:underline"
+                        >
+                          {o.holderName}
+                        </Link>
+                      ) : (
+                        <span className="text-gray-400">Vacant</span>
+                      )}
+                    </td>
+                    <td className="px-2 py-1 text-right align-top text-xs">
+                      {formatFitScore(o.fitScore)}
+                    </td>
+                    <td className="px-2 py-1 text-right align-top text-xs text-gray-600">
+                      {formatTermRemaining(o.termYearsRemaining)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      {/* Country performance panel (existing NEW) */}
       <section className="border rounded-lg p-4 bg-white shadow-sm space-y-4">
         <h2 className="text-xl font-semibold">Country Performance</h2>
 
@@ -224,25 +309,6 @@ export default function PlayerCountryPage() {
               )}
             </div>
           </>
-        )}
-      </section>
-
-      {/* Existing offices section */}
-      <section>
-        <h2 className="text-xl font-semibold">Offices</h2>
-        {data.offices.length === 0 ? (
-          <p className="text-sm text-gray-600">No offices defined.</p>
-        ) : (
-          <ul className="list-disc ml-6 text-sm">
-            {data.offices.map((o) => (
-              <li key={o.id}>
-                {o.name} —{' '}
-                {o.currentHolder
-                  ? `Current holder: ${o.currentHolder}`
-                  : 'Vacant'}
-              </li>
-            ))}
-          </ul>
         )}
       </section>
 

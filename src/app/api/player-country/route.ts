@@ -3,6 +3,26 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getCountryPerformanceSummary } from '@/lib/performance';
 
+function clamp0to100(v: number): number {
+  return Math.max(0, Math.min(100, v));
+}
+
+// Simple v1 "fit" score for officeholders
+function computeOfficeFit(person: {
+  leadership: number;
+  judgment: number;
+  integrity: number;
+  charisma: number;
+}): number {
+  const raw =
+    0.3 * person.leadership +
+    0.3 * person.judgment +
+    0.2 * person.integrity +
+    0.2 * person.charisma;
+
+  return clamp0to100(raw);
+}
+
 export async function GET() {
   try {
     // Single world assumption, same as standings
@@ -91,52 +111,60 @@ export async function GET() {
       },
     });
 
-    // Offices + current / past terms
+    // High-level offices: country-level, for this country, top by prestige
     const offices = await prisma.office.findMany({
       where: {
         worldId,
         countryId,
+        level: 'Country',
       },
       include: {
         terms: {
-          orderBy: { startYear: 'asc' },
+          where: { endYear: null }, // active term only
           include: {
             person: true,
           },
         },
       },
+      orderBy: {
+        prestige: 'desc',
+      },
+      take: 8, // top N cabinet roles
     });
 
     const officePayload = offices.map((office) => {
-      const currentTerm =
-        office.terms.find((t) => t.endYear === null) ?? null;
-      const pastTerms = office.terms.filter((t) => t.endYear !== null);
+      const activeTerm = office.terms[0] ?? null;
+      const holder = activeTerm?.person ?? null;
+
+      let fitScore: number | null = null;
+      let termYearsRemaining: number | null = null;
+
+      if (holder) {
+        fitScore = computeOfficeFit({
+          leadership: holder.leadership,
+          judgment: holder.judgment,
+          integrity: holder.integrity,
+          charisma: holder.charisma,
+        });
+      }
+
+      if (activeTerm && office.termLength && office.termLength > 0) {
+        const yearsServed = currentYear - activeTerm.startYear;
+        termYearsRemaining = Math.max(0, office.termLength - yearsServed);
+      }
 
       return {
         id: office.id,
         name: office.name,
-        level: office.level,
-        termLength: office.termLength,
         prestige: office.prestige,
-        currentTerm: currentTerm
-          ? {
-              id: currentTerm.id,
-              personId: currentTerm.personId,
-              personName: currentTerm.person.name,
-              startYear: currentTerm.startYear,
-            }
-          : null,
-        pastTerms: pastTerms.map((t) => ({
-          id: t.id,
-          personId: t.personId,
-          personName: t.person.name,
-          startYear: t.startYear,
-          endYear: t.endYear,
-        })),
+        holderId: holder ? holder.id : null,
+        holderName: holder ? holder.name : null,
+        fitScore,
+        termYearsRemaining,
       };
     });
 
-    // NEW: performance summary for this country + year
+    // Performance summary for this country + year
     const performance = await getCountryPerformanceSummary(
       worldId,
       countryId,
@@ -153,7 +181,7 @@ export async function GET() {
         employed,
         unemployed,
         offices: officePayload,
-        performance, // 👈 what the client now reads
+        performance,
       },
       { status: 200 },
     );
