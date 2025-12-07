@@ -75,6 +75,24 @@ function clampPrestige(v: number) {
   return Math.max(0, Math.min(100, Math.round(v)));
 }
 
+// Government: how good is this person as a leader?
+function computeLeaderRating(person: {
+  leadership: number;
+  judgment: number;
+  integrity: number;
+  charisma: number;
+}): number {
+  const raw =
+    0.3 * person.leadership +
+    0.3 * person.judgment +
+    0.2 * person.integrity +
+    0.2 * person.charisma;
+
+  const clamped = Math.max(0, Math.min(100, raw));
+  return clamped;
+}
+
+
 // simple normal noise generator for dev
 function normalNoise(sd: number): number {
   if (sd <= 0) return 0;
@@ -1457,6 +1475,75 @@ async function computeCompanyYearPerformance(
     ),
   );
 }
+// How strongly governmentScore affects country totalScore.
+// Interpreted as: each point of gov score (0–100) is worth this many "output" points.
+const GOVERNMENT_SCORE_WEIGHT = 5;
+
+// ============================================================================
+// GOVERNMENT YEARLY PERFORMANCE (v1)
+// ============================================================================
+
+async function computeGovernmentScoreForCountryYear(
+  worldId: number,
+  countryId: number,
+  year: number,
+): Promise<number> {
+  // All country-level offices for this world + country
+  const offices = await prisma.office.findMany({
+    where: {
+      worldId,
+      countryId,
+      level: 'Country', // ignore world-level offices in v1
+    },
+    include: {
+      terms: {
+        include: {
+          person: true,
+        },
+      },
+    },
+  });
+
+  if (offices.length === 0) {
+    return 0;
+  }
+
+  let totalWeighted = 0;
+  let maxPossible = 0;
+
+  for (const office of offices) {
+    const prestige = office.prestige ?? 0;
+    if (prestige <= 0) continue;
+
+    // Max possible contribution if this office is held by a perfect 100-rated leader.
+    maxPossible += prestige * 100;
+
+    // "Current" term: the one with no endYear (the sim treats that as the active holder)
+    const activeTerm = office.terms.find((t) => t.endYear === null);
+    if (!activeTerm || !activeTerm.person) continue;
+
+    const p = activeTerm.person;
+
+    const leaderRating = computeLeaderRating({
+      leadership: p.leadership,
+      judgment: p.judgment,
+      integrity: p.integrity,
+      charisma: p.charisma,
+    });
+
+    totalWeighted += leaderRating * prestige;
+  }
+
+  if (maxPossible === 0) {
+    return 0;
+  }
+
+  const normalized = (totalWeighted / maxPossible) * 100;
+  const clamped = Math.max(0, Math.min(100, normalized));
+
+  return clamped;
+}
+
 
 // ============================================================================
 // COUNTRY YEARLY PERFORMANCE (v1)
@@ -1505,29 +1592,48 @@ async function computeCountryYearPerformance(
     where: { worldId, year },
   });
 
-  // Build rows to insert
-  const rowsToInsert = Array.from(companyScoreByCountry.entries()).map(
-    ([countryId, companyScore]) => {
-      const governmentScore = 0; // placeholder
-      const populationScore = 0; // placeholder
-      const totalScore = companyScore + governmentScore + populationScore;
+  // Build rows to insert, now including governmentScore
+  const rowsToInsert: {
+    worldId: number;
+    countryId: number;
+    year: number;
+    companyScore: number;
+    governmentScore: number;
+    populationScore: number;
+    totalScore: number;
+    isChampion: boolean;
+  }[] = [];
 
-      return {
-        worldId,
-        countryId,
-        year,
-        companyScore,
-        governmentScore,
-        populationScore,
-        totalScore,
-        isChampion: false, // will set below
-      };
-    },
-  );
+  for (const [countryId, companyScore] of companyScoreByCountry.entries()) {
+    const governmentScore = await computeGovernmentScoreForCountryYear(
+      worldId,
+      countryId,
+      year,
+    );
+
+    const populationScore = 0; // still a placeholder in v1
+
+    const totalScore =
+      companyScore +
+      GOVERNMENT_SCORE_WEIGHT * governmentScore +
+      populationScore;
+
+    rowsToInsert.push({
+      worldId,
+      countryId,
+      year,
+      companyScore,
+      governmentScore,
+      populationScore,
+      totalScore,
+      isChampion: false, // will set below
+    });
+  }
 
   await prisma.countryYearPerformance.createMany({
     data: rowsToInsert,
   });
+
 
   // Now select champion for this world/year
   const rows = await prisma.countryYearPerformance.findMany({
