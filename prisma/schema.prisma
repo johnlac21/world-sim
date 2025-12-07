@@ -286,6 +286,8 @@ model Term {
   startYear Int
   endYear   Int?
 
+  playerLocked Boolean @default(false)
+
   createdAt DateTime @default(now())
 }
 

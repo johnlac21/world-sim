@@ -897,6 +897,11 @@ export async function tickYear(worldId: number) {
     const currentTerm =
       office.terms.find((t) => t.endYear === null) || null;
 
+    // If there is an active, player-locked term, we NEVER auto-replace it
+    if (currentTerm && (currentTerm as any).playerLocked) {
+      continue;
+    }
+
     const needElection =
       !currentTerm || newYear - currentTerm.startYear >= office.termLength;
 
@@ -958,6 +963,7 @@ export async function tickYear(worldId: number) {
           officeId: office.id,
           personId: winner.id,
           startYear: newYear,
+          // playerLocked defaults to false (auto-elected)
         },
       }),
     );
@@ -971,6 +977,7 @@ export async function tickYear(worldId: number) {
       );
     }
   }
+
 
   // ---------- PER-PERSON: education + jobs ----------
   for (const person of peopleFull) {

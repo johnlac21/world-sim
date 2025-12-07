@@ -53,22 +53,41 @@ type PlayerCountryPayload = {
   performance?: CountryPerformanceSummary | null;
 };
 
+type OfficeCandidate = {
+  id: number;
+  name: string;
+  age: number;
+  fitScore: number | null;
+  currentOfficeName: string | null;
+  isCurrentHolder: boolean;
+};
+
 export default function PlayerCountryPage() {
   const [data, setData] = useState<PlayerCountryPayload | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // NEW: modal + candidates state
+  const [selectedOffice, setSelectedOffice] =
+    useState<GovernmentOfficeRow | null>(null);
+  const [candidates, setCandidates] = useState<OfficeCandidate[] | null>(null);
+  const [modalError, setModalError] = useState<string | null>(null);
+  const [modalLoading, setModalLoading] = useState(false);
+  const [appointing, setAppointing] = useState(false);
+
+  const load = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch('/api/player-country');
+      const json = await res.json();
+      setData(json);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const load = async () => {
-      try {
-        const res = await fetch('/api/player-country');
-        const json = await res.json();
-        setData(json);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
     load();
   }, []);
 
@@ -87,6 +106,71 @@ export default function PlayerCountryPage() {
     if (termYearsRemaining <= 0) return 'Term ending';
     if (termYearsRemaining === 1) return '1 year left';
     return `${termYearsRemaining} years left`;
+  };
+
+  const openReassignModal = async (office: GovernmentOfficeRow) => {
+    setSelectedOffice(office);
+    setModalError(null);
+    setCandidates(null);
+    setModalLoading(true);
+
+    try {
+      const res = await fetch(`/api/player/offices/${office.id}/candidates`);
+      const json = await res.json();
+      if (!res.ok || json.error) {
+        setModalError(json.error || 'Failed to load candidates');
+        setCandidates([]);
+      } else {
+        setCandidates(json.candidates as OfficeCandidate[]);
+      }
+    } catch (err) {
+      console.error(err);
+      setModalError('Failed to load candidates');
+      setCandidates([]);
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  const closeReassignModal = () => {
+    setSelectedOffice(null);
+    setCandidates(null);
+    setModalError(null);
+    setModalLoading(false);
+    setAppointing(false);
+  };
+
+  const handleAppoint = async (candidateId: number) => {
+    if (!selectedOffice) return;
+
+    setAppointing(true);
+    setModalError(null);
+
+    try {
+      const res = await fetch(
+        `/api/player/offices/${selectedOffice.id}/appoint`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ personId: candidateId }),
+        },
+      );
+
+      const json = await res.json();
+      if (!res.ok || json.error) {
+        setModalError(json.error || 'Failed to appoint officeholder');
+        setAppointing(false);
+        return;
+      }
+
+      // Refresh player-country data so the government card updates
+      await load();
+      closeReassignModal();
+    } catch (err) {
+      console.error(err);
+      setModalError('Failed to appoint officeholder');
+      setAppointing(false);
+    }
   };
 
   return (
@@ -130,6 +214,7 @@ export default function PlayerCountryPage() {
                   <th className="px-2 py-1 text-left border-b">Holder</th>
                   <th className="px-2 py-1 text-right border-b">Fit</th>
                   <th className="px-2 py-1 text-right border-b">Term</th>
+                  <th className="px-2 py-1 text-right border-b">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -168,6 +253,14 @@ export default function PlayerCountryPage() {
                     </td>
                     <td className="px-2 py-1 text-right align-top text-xs text-gray-600">
                       {formatTermRemaining(o.termYearsRemaining)}
+                    </td>
+                    <td className="px-2 py-1 text-right align-top text-xs">
+                      <button
+                        className="px-2 py-1 border rounded text-xs bg-blue-50 hover:bg-blue-100 text-blue-700"
+                        onClick={() => openReassignModal(o)}
+                      >
+                        Reassign
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -311,6 +404,91 @@ export default function PlayerCountryPage() {
           </>
         )}
       </section>
+
+      {/* Reassign Office Modal */}
+      {selectedOffice && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-lg p-4 space-y-3">
+            <div className="flex items-baseline justify-between">
+              <h3 className="text-lg font-semibold">
+                Reassign {selectedOffice.name}
+              </h3>
+              <button
+                className="text-xs text-gray-500 hover:text-gray-800"
+                onClick={closeReassignModal}
+              >
+                Close
+              </button>
+            </div>
+
+            {modalError && (
+              <p className="text-xs text-red-600">{modalError}</p>
+            )}
+
+            {modalLoading && (
+              <p className="text-sm text-gray-600">Loading candidates…</p>
+            )}
+
+            {!modalLoading && candidates && candidates.length === 0 && (
+              <p className="text-sm text-gray-600">
+                No eligible candidates available for this office.
+              </p>
+            )}
+
+            {!modalLoading && candidates && candidates.length > 0 && (
+              <div className="max-h-64 overflow-y-auto border rounded">
+                <table className="min-w-full text-xs">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-2 py-1 text-left border-b">Name</th>
+                      <th className="px-2 py-1 text-right border-b">Age</th>
+                      <th className="px-2 py-1 text-right border-b">Fit</th>
+                      <th className="px-2 py-1 text-right border-b">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {candidates.map((c) => (
+                      <tr
+                        key={c.id}
+                        className="odd:bg-white even:bg-gray-50 border-b last:border-0"
+                      >
+                        <td className="px-2 py-1">
+                          {c.name}
+                          {c.isCurrentHolder && (
+                            <span className="ml-1 text-[10px] text-gray-400">
+                              (current)
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-2 py-1 text-right">{c.age}</td>
+                        <td className="px-2 py-1 text-right">
+                          {c.fitScore == null
+                            ? '—'
+                            : `${Math.round(c.fitScore)}/100`}
+                        </td>
+                        <td className="px-2 py-1 text-right">
+                          <button
+                            className="px-2 py-1 border rounded text-[11px] bg-blue-50 hover:bg-blue-100 text-blue-700 disabled:opacity-50"
+                            disabled={appointing}
+                            onClick={() => handleAppoint(c.id)}
+                          >
+                            {appointing ? 'Appointing…' : 'Appoint'}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            <p className="text-[11px] text-gray-500">
+              Manual appointments are treated as player overrides and will not
+              be replaced by auto elections while active.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Later: policy sliders, budgets, etc. */}
     </main>
