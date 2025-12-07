@@ -28,6 +28,22 @@ export async function GET(
     );
   }
 
+  // --- Latest performance (v1) ---
+  const latestRow = await prisma.companyYearPerformance.findFirst({
+    where: { companyId },
+    orderBy: { year: 'desc' },
+  });
+
+  const latestPerformance = latestRow
+    ? {
+        year: latestRow.year,
+        talentScore: latestRow.talentScore,
+        leadershipScore: latestRow.leadershipScore,
+        reliabilityScore: latestRow.reliabilityScore,
+        outputScore: latestRow.outputScore,
+      }
+    : null;
+
   // Roles for this company's industry
   const roles = await prisma.industryRole.findMany({
     where: { industry: company.industry },
@@ -89,7 +105,9 @@ export async function GET(
       name: company.name,
       industry: company.industry,
       countryId: company.countryId,
+      worldId: company.worldId, // added for "View in Standings" link
     },
     hierarchy,
+    latestPerformance, // v1 panel data; may be null
   });
 }

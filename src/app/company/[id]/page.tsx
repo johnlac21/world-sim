@@ -28,39 +28,28 @@ type CompanyInfo = {
   name: string;
   industry: string;
   countryId: number;
+  worldId: number;
 };
 
-type CompanyHierarchyPayload = {
-  company: CompanyInfo;
-  hierarchy: HierarchyRole[];
-};
-
-// ---- Performance types ----
-
-type PerformanceRow = {
+type LatestPerformance = {
   year: number;
   talentScore: number;
   leadershipScore: number;
   reliabilityScore: number;
   outputScore: number;
-};
+} | null;
 
-type CompanyPerformancePayload = {
+type CompanyHierarchyPayload = {
   company: CompanyInfo;
-  currentYear: number;
-  currentPerformance: PerformanceRow | null;
-  history: PerformanceRow[];
+  hierarchy: HierarchyRole[];
+  latestPerformance: LatestPerformance;
 };
 
 export default function CompanyPage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
 
-  const [hierarchyData, setHierarchyData] =
-    useState<CompanyHierarchyPayload | null>(null);
-  const [performanceData, setPerformanceData] =
-    useState<CompanyPerformancePayload | null>(null);
-
+  const [data, setData] = useState<CompanyHierarchyPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -72,33 +61,17 @@ export default function CompanyPage() {
         setLoading(true);
         setError(null);
 
-        const [hierarchyRes, perfRes] = await Promise.all([
-          fetch(`/api/company/${id}/hierarchy`),
-          fetch(`/api/company/${id}`),
-        ]);
+        const res = await fetch(`/api/company/${id}/hierarchy`);
 
-        if (!hierarchyRes.ok) {
-          const body = await hierarchyRes.json().catch(() => ({}));
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
           throw new Error(
-            body.error ||
-              `Hierarchy request failed (${hierarchyRes.status})`,
+            body.error || `Hierarchy request failed (${res.status})`,
           );
         }
 
-        if (!perfRes.ok) {
-          const body = await perfRes.json().catch(() => ({}));
-          throw new Error(
-            body.error || `Performance request failed (${perfRes.status})`,
-          );
-        }
-
-        const hierarchyJson =
-          (await hierarchyRes.json()) as CompanyHierarchyPayload;
-        const perfJson =
-          (await perfRes.json()) as CompanyPerformancePayload;
-
-        setHierarchyData(hierarchyJson);
-        setPerformanceData(perfJson);
+        const json = (await res.json()) as CompanyHierarchyPayload;
+        setData(json);
       } catch (err: any) {
         console.error(err);
         setError(
@@ -117,13 +90,7 @@ export default function CompanyPage() {
     return <main className="p-4">Loading company…</main>;
   }
 
-  if (
-    error ||
-    !hierarchyData ||
-    (hierarchyData as any).error ||
-    !performanceData ||
-    (performanceData as any).error
-  ) {
+  if (error || !data || (data as any).error) {
     return (
       <main className="p-4 space-y-2">
         <p>Company not found or failed to load.</p>
@@ -134,12 +101,7 @@ export default function CompanyPage() {
     );
   }
 
-  const { company, hierarchy } = hierarchyData;
-  const {
-    currentYear,
-    currentPerformance,
-    history,
-  } = performanceData;
+  const { company, hierarchy, latestPerformance } = data;
 
   return (
     <main className="flex flex-col md:flex-row">
@@ -154,115 +116,72 @@ export default function CompanyPage() {
             Industry:{' '}
             <span className="font-medium">{company.industry}</span>
           </p>
-          <p className="text-xs text-gray-500">
-            World year: {currentYear}
-          </p>
         </header>
 
         <section className="space-y-2">
           <h2 className="text-lg font-semibold">Company Overview</h2>
           <p className="text-sm text-gray-600">
             This page shows the company&apos;s current leadership hierarchy
-            in the sidebar and its simulated yearly performance below.
+            in the sidebar and its yearly performance below.
           </p>
         </section>
 
-        {/* PERFORMANCE PANEL */}
-        <section className="border rounded-lg p-4 bg-white shadow-sm space-y-4">
-          <h2 className="text-lg font-semibold">Performance</h2>
+        {/* PERFORMANCE (CURRENT YEAR) PANEL */}
+        <section className="border border-gray-200 rounded-lg bg-gray-50 p-4 shadow-sm space-y-4">
+          <h2 className="text-lg font-semibold">Performance (Current Year)</h2>
 
-          {history.length === 0 ? (
+          {latestPerformance === null ? (
             <p className="text-sm text-gray-600">
-              No performance data yet — simulate a year to see results.
+              No performance data yet — simulate a year to generate company
+              output.
             </p>
           ) : (
-            <>
-              {/* Current-year summary */}
-              {currentPerformance ? (
-                <div className="space-y-1">
-                  <p className="text-sm font-medium">
-                    Year {currentPerformance.year} performance:
-                    <span className="ml-1 text-base font-semibold">
-                      {currentPerformance.outputScore.toFixed(1)}
-                    </span>
-                  </p>
-                  <div className="grid grid-cols-3 gap-2 text-xs text-gray-700">
-                    <div>
-                      <div className="font-semibold">Talent</div>
-                      <div>{currentPerformance.talentScore.toFixed(1)}</div>
-                    </div>
-                    <div>
-                      <div className="font-semibold">Leadership</div>
-                      <div>
-                        {currentPerformance.leadershipScore.toFixed(1)}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="font-semibold">Reliability</div>
-                      <div>
-                        {currentPerformance.reliabilityScore.toFixed(1)}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-sm text-gray-600">
-                  This company has historical performance but no record for
-                  year {currentYear} yet.
+            <div className="space-y-3">
+              <div>
+                <p className="text-sm font-medium">
+                  Performance — Year {latestPerformance.year}
                 </p>
-              )}
-
-              {/* History table */}
-              <div className="pt-2">
-                <h3 className="text-sm font-medium mb-2">History</h3>
-                <div className="overflow-x-auto">
-                  <table className="min-w-full text-xs border border-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-2 py-1 text-left border-b">
-                          Year
-                        </th>
-                        <th className="px-2 py-1 text-right border-b">
-                          Output
-                        </th>
-                        <th className="px-2 py-1 text-right border-b">
-                          Talent
-                        </th>
-                        <th className="px-2 py-1 text-right border-b">
-                          Leadership
-                        </th>
-                        <th className="px-2 py-1 text-right border-b">
-                          Reliability
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {history.map((row) => (
-                        <tr
-                          key={row.year}
-                          className="odd:bg-white even:bg-gray-50"
-                        >
-                          <td className="px-2 py-1 border-b">{row.year}</td>
-                          <td className="px-2 py-1 text-right border-b">
-                            {row.outputScore.toFixed(1)}
-                          </td>
-                          <td className="px-2 py-1 text-right border-b">
-                            {row.talentScore.toFixed(1)}
-                          </td>
-                          <td className="px-2 py-1 text-right border-b">
-                            {row.leadershipScore.toFixed(1)}
-                          </td>
-                          <td className="px-2 py-1 text-right border-b">
-                            {row.reliabilityScore.toFixed(1)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <p className="mt-1 text-sm">
+                  Output Score:{' '}
+                  <span className="font-semibold">
+                    {latestPerformance.outputScore.toFixed(1)}
+                  </span>
+                </p>
               </div>
-            </>
+
+              <div className="text-sm text-gray-700 space-y-1">
+                <p className="font-medium">Breakdown:</p>
+                <p>
+                  Talent:{' '}
+                  <span className="font-mono">
+                    {latestPerformance.talentScore.toFixed(1)}
+                  </span>
+                </p>
+                <p>
+                  Leadership:{' '}
+                  <span className="font-mono">
+                    {latestPerformance.leadershipScore.toFixed(1)}
+                  </span>
+                </p>
+                <p>
+                  Reliability:{' '}
+                  <span className="font-mono">
+                    {latestPerformance.reliabilityScore.toFixed(1)}
+                  </span>
+                </p>
+              </div>
+            </div>
           )}
+
+          {/* View in standings */}
+          <div className="pt-2 border-t border-gray-200 mt-2">
+            <Link
+              href={`/world/${company.worldId}/standings`}
+              className="text-sm text-blue-600 hover:underline"
+            >
+              View Country &amp; World Rankings →
+            </Link>
+          </div>
         </section>
       </section>
 
@@ -304,7 +223,7 @@ export default function CompanyPage() {
                         ({slot.person.age})
                       </span>
                     </p>
-                    <p className="mt-0.5 text-[11px] text-gray-600">
+                    <p className="mt-0.5 text[11px] text-gray-600">
                       Int {slot.person.intelligence} · Lead{' '}
                       {slot.person.leadership} · Disc{' '}
                       {slot.person.discipline} · Cha {slot.person.charisma}
