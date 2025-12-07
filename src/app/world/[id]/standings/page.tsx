@@ -1,26 +1,25 @@
+// app/world/[id]/standings/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 
-type IndustryStanding = {
-  industry: string;
-  numCompanies: number;
-  totalOutput: number;
-  averageOutput: number | null;
+type Trend = 'up' | 'down' | 'same' | 'new';
+
+type HistoryEntry = {
+  year: number;
+  totalScore: number;
 };
 
-type CountryStanding = {
-  country: {
-    id: number;
-    name: string;
-  };
-  overall: {
-    totalOutput: number;
-    averageOutput: number | null;
-  };
-  industries: IndustryStanding[];
+type LeagueStanding = {
+  countryId: number;
+  countryName: string;
+  currentRank: number;
+  lastYearRank: number | null;
+  trend: Trend;
+  totalScore: number;
+  history: HistoryEntry[];
 };
 
 type ApiResponse = {
@@ -28,10 +27,11 @@ type ApiResponse = {
     id: number;
     name: string;
     currentYear: number;
-  };
-  standings: CountryStanding[];
+  } | null;
+  standings: LeagueStanding[];
 };
 
+// Top companies types (unchanged)
 type TopCompany = {
   companyId: number;
   name: string;
@@ -46,7 +46,7 @@ type TopCompaniesResponse = {
     id: number;
     name: string;
     currentYear: number;
-  };
+  } | null;
   companies: TopCompany[];
 };
 
@@ -56,6 +56,20 @@ const INDUSTRY_LABELS: Record<string, string> = {
   RESEARCH: 'Research',
 };
 
+function TrendIcon({ trend }: { trend: Trend }) {
+  if (trend === 'up') {
+    return <span className="text-green-600 text-sm">↑</span>;
+  }
+  if (trend === 'down') {
+    return <span className="text-red-600 text-sm">↓</span>;
+  }
+  if (trend === 'same') {
+    return <span className="text-gray-500 text-sm">→</span>;
+  }
+  // 'new'
+  return <span className="text-blue-600 text-sm">•</span>;
+}
+
 export default function WorldStandingsPage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
@@ -64,17 +78,13 @@ export default function WorldStandingsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [sortKey, setSortKey] = useState<
-    'overall' | 'TECH' | 'FINANCE' | 'RESEARCH'
-  >('overall');
-
-  // Top companies state
+  // Top companies state (unchanged)
   const [topCompanies, setTopCompanies] =
     useState<TopCompaniesResponse | null>(null);
   const [topLoading, setTopLoading] = useState(true);
   const [topError, setTopError] = useState<string | null>(null);
 
-  // --------- LOAD STANDINGS ---------
+  // --------- LOAD STANDINGS (CountryYearPerformance-based) ---------
   useEffect(() => {
     if (!id) return;
 
@@ -111,7 +121,7 @@ export default function WorldStandingsPage() {
     };
   }, [id]);
 
-  // --------- LOAD TOP COMPANIES ---------
+  // --------- LOAD TOP COMPANIES (unchanged) ---------
   useEffect(() => {
     if (!id) return;
 
@@ -150,7 +160,7 @@ export default function WorldStandingsPage() {
 
   // --------- EARLY RETURNS (NO HOOKS BELOW THIS LINE) ---------
   if (loading) {
-    return <main className="p-4">Loading national standings…</main>;
+    return <main className="p-4">Loading league table…</main>;
   }
 
   if (error || !data) {
@@ -169,73 +179,23 @@ export default function WorldStandingsPage() {
 
   const { world, standings } = data;
 
-  // Sorted standings (same logic as before)
-  const sortedStandings = [...standings].sort((a, b) => {
-    if (sortKey === 'overall') {
-      if (b.overall.totalOutput !== a.overall.totalOutput) {
-        return b.overall.totalOutput - a.overall.totalOutput;
-      }
-      const aAvg = a.overall.averageOutput ?? 0;
-      const bAvg = b.overall.averageOutput ?? 0;
-      if (bAvg !== aAvg) return bAvg - aAvg;
-      return a.country.name.localeCompare(b.country.name);
-    }
+  if (!world) {
+    return (
+      <main className="p-4 space-y-3">
+        <p className="text-sm text-gray-600">
+          No world found in the database yet.
+        </p>
+        <Link href="/" className="text-blue-600 underline">
+          ← Back to world overview
+        </Link>
+      </main>
+    );
+  }
 
-    const getIndTotal = (row: CountryStanding) => {
-      const block = row.industries.find(
-        (ind) => ind.industry === sortKey,
-      );
-      return block ? block.totalOutput : 0;
-    };
-
-    const aTot = getIndTotal(a);
-    const bTot = getIndTotal(b);
-
-    if (bTot !== aTot) return bTot - aTot;
-    return a.country.name.localeCompare(b.country.name);
-  });
-
-  // Global industry view derived from standings (no hooks)
-  const globalIndustryStats = (() => {
-    type GlobalInd = {
-      industry: string;
-      totalOutput: number;
-      totalCompanies: number;
-      bestCountryId: number | null;
-      bestCountryName: string | null;
-      bestCountryOutput: number;
-    };
-
-    const map = new Map<string, GlobalInd>();
-
-    for (const row of standings) {
-      for (const ind of row.industries) {
-        let entry = map.get(ind.industry);
-        if (!entry) {
-          entry = {
-            industry: ind.industry,
-            totalOutput: 0,
-            totalCompanies: 0,
-            bestCountryId: null,
-            bestCountryName: null,
-            bestCountryOutput: 0,
-          };
-          map.set(ind.industry, entry);
-        }
-
-        entry.totalOutput += ind.totalOutput;
-        entry.totalCompanies += ind.numCompanies;
-
-        if (ind.totalOutput > entry.bestCountryOutput) {
-          entry.bestCountryOutput = ind.totalOutput;
-          entry.bestCountryId = row.country.id;
-          entry.bestCountryName = row.country.name;
-        }
-      }
-    }
-
-    return Array.from(map.values());
-  })();
+  // Ensure standings are sorted by currentRank ascending
+  const sortedStandings = [...standings].sort(
+    (a, b) => a.currentRank - b.currentRank,
+  );
 
   return (
     <main className="p-4 space-y-8">
@@ -244,86 +204,25 @@ export default function WorldStandingsPage() {
         <Link href="/" className="text-blue-600 underline">
           ← Back to world overview
         </Link>
-        <h1 className="text-2xl font-bold">
-          National Industry Standings
-        </h1>
+        <h1 className="text-2xl font-bold">Country Standings</h1>
         <p className="text-sm text-gray-600">
           World: {world.name} · Year {world.currentYear}
         </p>
         <p className="text-xs text-gray-500">
-          Countries are ranked by total industry output (v1). Use the sort
-          control to focus on a specific industry.
+          Countries are ranked by their <code>totalScore</code> from{' '}
+          <code>CountryYearPerformance</code> for the current season. Arrows
+          show movement compared to last year.
         </p>
       </header>
 
-      {/* Sort controls */}
-      <section className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-sm font-semibold text-gray-700">
-            Sort by
-          </p>
-          <p className="text-xs text-gray-500">
-            Overall or per-industry total output.
-          </p>
-        </div>
-        <div className="flex gap-2 text-sm">
-          <button
-            type="button"
-            onClick={() => setSortKey('overall')}
-            className={[
-              'rounded-md border px-3 py-1',
-              sortKey === 'overall'
-                ? 'border-blue-500 bg-blue-50 text-blue-700'
-                : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50',
-            ].join(' ')}
-          >
-            Overall
-          </button>
-          <button
-            type="button"
-            onClick={() => setSortKey('TECH')}
-            className={[
-              'rounded-md border px-3 py-1',
-              sortKey === 'TECH'
-                ? 'border-blue-500 bg-blue-50 text-blue-700'
-                : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50',
-            ].join(' ')}
-          >
-            Tech
-          </button>
-          <button
-            type="button"
-            onClick={() => setSortKey('FINANCE')}
-            className={[
-              'rounded-md border px-3 py-1',
-              sortKey === 'FINANCE'
-                ? 'border-blue-500 bg-blue-50 text-blue-700'
-                : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50',
-            ].join(' ')}
-          >
-            Finance
-          </button>
-          <button
-            type="button"
-            onClick={() => setSortKey('RESEARCH')}
-            className={[
-              'rounded-md border px-3 py-1',
-              sortKey === 'RESEARCH'
-                ? 'border-blue-500 bg-blue-50 text-blue-700'
-                : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50',
-            ].join(' ')}
-          >
-            Research
-          </button>
-        </div>
-      </section>
-
-      {/* Standings table */}
+      {/* League Table */}
       {sortedStandings.length === 0 ? (
-        <p className="text-sm text-gray-600">
-          No standings yet — this world has no countries with companies
-          and performance data.
-        </p>
+        <section>
+          <p className="text-sm text-gray-600">
+            No league standings yet — simulate at least one year to generate
+            country performance.
+          </p>
+        </section>
       ) : (
         <section className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200 text-sm">
@@ -336,66 +235,63 @@ export default function WorldStandingsPage() {
                   Country
                 </th>
                 <th className="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                  Overall Total
+                  Score
                 </th>
                 <th className="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                  Overall Avg
+                  Last Year
                 </th>
-                <th className="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                  Tech Total
+                <th className="px-3 py-2 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                  Trend
                 </th>
-                <th className="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                  Finance Total
-                </th>
-                <th className="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                  Research Total
+                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                  Recent Seasons
                 </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 bg-white">
-              {sortedStandings.map((row, idx) => {
-                const tech = row.industries.find(
-                  (i) => i.industry === 'TECH',
-                );
-                const fin = row.industries.find(
-                  (i) => i.industry === 'FINANCE',
-                );
-                const res = row.industries.find(
-                  (i) => i.industry === 'RESEARCH',
+              {sortedStandings.map((row) => {
+                const historySorted = [...row.history].sort(
+                  (a, b) => a.year - b.year,
                 );
 
                 return (
                   <tr
-                    key={row.country.id}
+                    key={row.countryId}
                     className="hover:bg-gray-50 transition"
                   >
                     <td className="px-3 py-2 text-xs text-gray-500">
-                      {idx + 1}
+                      {row.currentRank}
                     </td>
                     <td className="px-3 py-2">
                       <Link
-                        href={`/country/${row.country.id}`}
+                        href={`/country/${row.countryId}`}
                         className="text-sm font-medium text-blue-700 hover:underline"
                       >
-                        {row.country.name}
+                        {row.countryName}
                       </Link>
                     </td>
                     <td className="px-3 py-2 text-right">
-                      {row.overall.totalOutput.toFixed(1)}
-                    </td>
-                    <td className="px-3 py-2 text-right">
-                      {row.overall.averageOutput != null
-                        ? row.overall.averageOutput.toFixed(1)
-                        : 'N/A'}
+                      {row.totalScore.toFixed(1)}
                     </td>
                     <td className="px-3 py-2 text-right text-xs text-gray-700">
-                      {tech ? tech.totalOutput.toFixed(1) : '0.0'}
+                      {row.lastYearRank != null ? row.lastYearRank : '–'}
                     </td>
-                    <td className="px-3 py-2 text-right text-xs text-gray-700">
-                      {fin ? fin.totalOutput.toFixed(1) : '0.0'}
+                    <td className="px-3 py-2 text-center">
+                      <TrendIcon trend={row.trend} />
                     </td>
-                    <td className="px-3 py-2 text-right text-xs text-gray-700">
-                      {res ? res.totalOutput.toFixed(1) : '0.0'}
+                    <td className="px-3 py-2 text-xs text-gray-600">
+                      {historySorted.length === 0 ? (
+                        <span>—</span>
+                      ) : (
+                        <span>
+                          {historySorted
+                            .map(
+                              (h) =>
+                                `${h.year}: ${h.totalScore.toFixed(1)}`,
+                            )
+                            .join(' · ')}
+                        </span>
+                      )}
                     </td>
                   </tr>
                 );
@@ -405,82 +301,7 @@ export default function WorldStandingsPage() {
         </section>
       )}
 
-      {/* Global industry performance */}
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold">
-          Global Industry Performance
-        </h2>
-        {globalIndustryStats.length === 0 ? (
-          <p className="text-sm text-gray-600">
-            No industry performance data yet.
-          </p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-xs border border-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-2 py-1 text-left border-b">
-                    Industry
-                  </th>
-                  <th className="px-2 py-1 text-right border-b">
-                    World Total Output
-                  </th>
-                  <th className="px-2 py-1 text-right border-b">
-                    Avg per Company
-                  </th>
-                  <th className="px-2 py-1 text-left border-b">
-                    Best Country
-                  </th>
-                  <th className="px-2 py-1 text-right border-b">
-                    Best Country Output
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {globalIndustryStats.map((ind) => {
-                  const avg =
-                    ind.totalCompanies === 0
-                      ? null
-                      : ind.totalOutput / ind.totalCompanies;
-                  return (
-                    <tr
-                      key={ind.industry}
-                      className="odd:bg-white even:bg-gray-50"
-                    >
-                      <td className="px-2 py-1 border-b">
-                        {INDUSTRY_LABELS[ind.industry] ?? ind.industry}
-                      </td>
-                      <td className="px-2 py-1 border-b text-right">
-                        {ind.totalOutput.toFixed(1)}
-                      </td>
-                      <td className="px-2 py-1 border-b text-right">
-                        {avg === null ? '—' : avg.toFixed(1)}
-                      </td>
-                      <td className="px-2 py-1 border-b">
-                        {ind.bestCountryId ? (
-                          <Link
-                            href={`/country/${ind.bestCountryId}`}
-                            className="text-blue-600 hover:underline"
-                          >
-                            {ind.bestCountryName}
-                          </Link>
-                        ) : (
-                          '—'
-                        )}
-                      </td>
-                      <td className="px-2 py-1 border-b text-right">
-                        {ind.bestCountryOutput.toFixed(1)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-
-      {/* Top companies */}
+      {/* Top companies (unchanged) */}
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">Top Companies</h2>
         {topLoading ? (
@@ -491,7 +312,7 @@ export default function WorldStandingsPage() {
           <p className="text-sm text-red-600">
             Failed to load top companies: {topError}
           </p>
-        ) : !topCompanies || topCompanies.companies.length === 0 ? (
+        ) : !topCompanies || !topCompanies.companies.length ? (
           <p className="text-sm text-gray-600">
             No company performance data yet.
           </p>

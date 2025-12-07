@@ -2,42 +2,63 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
-// Keep it as a const union to match your industries
-const INDUSTRIES = ['TECH', 'FINANCE', 'RESEARCH'] as const;
+type Trend = 'up' | 'down' | 'same' | 'new';
 
-export async function GET() {
-  console.log('[STANDINGS API] handler hit');
+export async function GET(
+  _req: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const { id } = await params; // 👈 await the promise
 
-  // For now, ignore [id] and just use the single active world,
-  // same pattern as /api/world.
-  const worlds = await prisma.world.findMany({
-    include: {
-      countries: true,
-    },
-  });
+  const worldIdParam = Number(id);
+  const worldId = Number.isFinite(worldIdParam) ? worldIdParam : NaN;
 
-  console.log('[STANDINGS API] worlds found:', worlds.length);
+  let world = null;
 
-  if (worlds.length === 0) {
-    // Even here, **do not 404** – return debug info with 200
+  if (!Number.isNaN(worldId)) {
+    world = await prisma.world.findUnique({
+      where: { id: worldId },
+    });
+  }
+
+  // Fallback: if bad id or not found, just use the first world
+  if (!world) {
+    world = await prisma.world.findFirst();
+  }
+
+  if (!world) {
     return NextResponse.json(
       {
-        debug: 'No worlds in database',
         world: null,
         standings: [],
+        error: 'No world found in database',
       },
       { status: 200 },
     );
   }
 
-  const world = worlds[0];
-  const worldId = world.id;
   const currentYear = world.currentYear;
-  const countries = world.countries;
+  const minYear = Math.max(0, currentYear - 4); // last ~5 seasons
 
-  console.log('[STANDINGS API] using worldId:', worldId, 'year:', currentYear);
+  const perfRows = await prisma.countryYearPerformance.findMany({
+    where: {
+      worldId: world.id,
+      year: {
+        gte: minYear,
+        lte: currentYear,
+      },
+    },
+    include: {
+      country: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+    },
+  });
 
-  if (countries.length === 0) {
+  if (perfRows.length === 0) {
     return NextResponse.json(
       {
         world: {
@@ -46,142 +67,109 @@ export async function GET() {
           currentYear,
         },
         standings: [],
-        debug: 'World has no countries',
       },
       { status: 200 },
     );
   }
 
-  const countryIds = countries.map((c) => c.id);
+  // Group history by country
+  type HistoryEntry = { year: number; totalScore: number };
 
-  const companies = await prisma.company.findMany({
-    where: {
-      worldId,
-      countryId: { in: countryIds },
-    },
-  });
-
-  console.log(
-    '[STANDINGS API] companies found:',
-    companies.length,
-    'for countries:',
-    countryIds,
-  );
-
-  const companyIds = companies.map((c) => c.id);
-
-  const performances =
-    companyIds.length === 0
-      ? []
-      : await prisma.companyYearPerformance.findMany({
-          where: {
-            worldId,
-            year: currentYear,
-            companyId: { in: companyIds },
-          },
-        });
-
-  console.log(
-    '[STANDINGS API] performances found for current year:',
-    performances.length,
-  );
-
-  const perfByCompanyId = new Map<number, (typeof performances)[number]>();
-  for (const perf of performances) {
-    perfByCompanyId.set(perf.companyId, perf);
-  }
-
-  type IndustryAgg = {
-    totalOutput: number;
-    count: number;
-  };
-
-  type CountryAgg = {
-    countryId: number;
-    industries: Map<string, IndustryAgg>;
-  };
-
-  const countryAggs = new Map<number, CountryAgg>();
-
-  for (const country of countries) {
-    const indMap = new Map<string, IndustryAgg>();
-    for (const ind of INDUSTRIES) {
-      indMap.set(ind, { totalOutput: 0, count: 0 });
+  const historyByCountry = new Map<
+    number,
+    {
+      countryId: number;
+      countryName: string;
+      history: HistoryEntry[];
     }
-    countryAggs.set(country.id, {
-      countryId: country.id,
-      industries: indMap,
+  >();
+
+  for (const row of perfRows) {
+    const countryId = row.countryId;
+    const key = countryId;
+
+    let bucket = historyByCountry.get(key);
+    if (!bucket) {
+      bucket = {
+        countryId,
+        countryName: row.country.name,
+        history: [],
+      };
+      historyByCountry.set(key, bucket);
+    }
+
+    bucket.history.push({
+      year: row.year,
+      totalScore: row.totalScore,
     });
   }
 
-  for (const company of companies) {
-    const perf = perfByCompanyId.get(company.id);
-    if (!perf) continue;
+  // Compute ranks per year: year -> countryId -> rank
+  const yearRank = new Map<number, Map<number, number>>();
 
-    const countryId = company.countryId;
-    const industry = company.industry;
+  for (let year = minYear; year <= currentYear; year++) {
+    const rowsForYear = perfRows.filter((r) => r.year === year);
+    if (rowsForYear.length === 0) continue;
 
-    const aggContainer = countryAggs.get(countryId);
-    if (!aggContainer) continue;
+    rowsForYear.sort((a, b) => {
+      if (b.totalScore !== a.totalScore) {
+        return b.totalScore - a.totalScore;
+      }
+      return a.countryId - b.countryId; // deterministic tie-break
+    });
 
-    if (!INDUSTRIES.includes(industry as (typeof INDUSTRIES)[number])) {
-      continue;
-    }
+    const rankMap = new Map<number, number>();
+    rowsForYear.forEach((row, index) => {
+      rankMap.set(row.countryId, index + 1);
+    });
 
-    const indAgg = aggContainer.industries.get(industry)!;
-    indAgg.totalOutput += perf.outputScore;
-    indAgg.count += 1;
+    yearRank.set(year, rankMap);
   }
 
-  const standings = countries.map((country) => {
-    const agg = countryAggs.get(country.id)!;
+  // Build standings from current year only (countries with current-year data)
+  const standings = Array.from(historyByCountry.values())
+    .map((bucket) => {
+      const currentRank =
+        yearRank.get(currentYear)?.get(bucket.countryId) ?? null;
 
-    let overallTotalOutput = 0;
-    let overallCount = 0;
+      if (currentRank == null) {
+        // Country has some history but no current-year row; omit from standings.
+        return null;
+      }
 
-    const industries = INDUSTRIES.map((industry) => {
-      const entry = agg.industries.get(industry)!;
-      overallTotalOutput += entry.totalOutput;
-      overallCount += entry.count;
+      const lastYearRank =
+        yearRank.get(currentYear - 1)?.get(bucket.countryId) ?? null;
 
-      const averageOutput =
-        entry.count === 0 ? null : entry.totalOutput / entry.count;
+      let trend: Trend;
+      if (lastYearRank == null) {
+        trend = 'new';
+      } else if (currentRank < lastYearRank) {
+        trend = 'up';
+      } else if (currentRank > lastYearRank) {
+        trend = 'down';
+      } else {
+        trend = 'same';
+      }
+
+      const currentEntry = bucket.history.find(
+        (h) => h.year === currentYear,
+      );
+      const totalScore = currentEntry?.totalScore ?? 0;
+
+      const history = bucket.history.slice(); // already filtered 5-year window
 
       return {
-        industry,
-        numCompanies: entry.count,
-        totalOutput: entry.totalOutput,
-        averageOutput,
+        countryId: bucket.countryId,
+        countryName: bucket.countryName,
+        currentRank,
+        lastYearRank,
+        trend,
+        totalScore,
+        history,
       };
-    });
-
-    const overallAverageOutput =
-      overallCount === 0 ? null : overallTotalOutput / overallCount;
-
-    return {
-      country: {
-        id: country.id,
-        name: country.name,
-      },
-      overall: {
-        totalOutput: overallTotalOutput,
-        averageOutput: overallAverageOutput,
-      },
-      industries,
-    };
-  });
-
-  standings.sort((a, b) => {
-    if (b.overall.totalOutput !== a.overall.totalOutput) {
-      return b.overall.totalOutput - a.overall.totalOutput;
-    }
-    const aAvg = a.overall.averageOutput ?? 0;
-    const bAvg = b.overall.averageOutput ?? 0;
-    if (bAvg !== aAvg) {
-      return bAvg - aAvg;
-    }
-    return a.country.name.localeCompare(b.country.name);
-  });
+    })
+    .filter((row): row is NonNullable<typeof row> => row !== null)
+    .sort((a, b) => a.currentRank - b.currentRank);
 
   return NextResponse.json(
     {
@@ -191,7 +179,6 @@ export async function GET() {
         currentYear,
       },
       standings,
-      debug: 'OK',
     },
     { status: 200 },
   );
