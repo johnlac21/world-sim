@@ -28,11 +28,14 @@ export async function GET(
     );
   }
 
-  // --- Latest performance (v1) ---
-  const latestRow = await prisma.companyYearPerformance.findFirst({
+  // --- Performance rows (used for latest + history) ---
+  const perfRowsDesc = await prisma.companyYearPerformance.findMany({
     where: { companyId },
     orderBy: { year: 'desc' },
+    take: 10, // last 10 years at most
   });
+
+  const latestRow = perfRowsDesc[0] ?? null;
 
   const latestPerformance = latestRow
     ? {
@@ -43,6 +46,17 @@ export async function GET(
         outputScore: latestRow.outputScore,
       }
     : null;
+
+  const performanceHistory = perfRowsDesc
+    .slice()
+    .sort((a, b) => a.year - b.year)
+    .map((row) => ({
+      year: row.year,
+      talentScore: row.talentScore,
+      leadershipScore: row.leadershipScore,
+      reliabilityScore: row.reliabilityScore,
+      outputScore: row.outputScore,
+    }));
 
   // Roles for this company's industry
   const roles = await prisma.industryRole.findMany({
@@ -105,9 +119,10 @@ export async function GET(
       name: company.name,
       industry: company.industry,
       countryId: company.countryId,
-      worldId: company.worldId, // added for "View in Standings" link
+      worldId: company.worldId, // for "View in Standings" link
     },
     hierarchy,
-    latestPerformance, // v1 panel data; may be null
+    latestPerformance,      // single latest year (or null)
+    performanceHistory,     // 0–10 rows, ascending by year
   });
 }

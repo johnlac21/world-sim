@@ -39,10 +39,19 @@ type LatestPerformance = {
   outputScore: number;
 } | null;
 
+type PerformanceRow = {
+  year: number;
+  talentScore: number;
+  leadershipScore: number;
+  reliabilityScore: number;
+  outputScore: number;
+};
+
 type CompanyHierarchyPayload = {
   company: CompanyInfo;
   hierarchy: HierarchyRole[];
   latestPerformance: LatestPerformance;
+  performanceHistory: PerformanceRow[];
 };
 
 export default function CompanyPage() {
@@ -101,7 +110,17 @@ export default function CompanyPage() {
     );
   }
 
-  const { company, hierarchy, latestPerformance } = data;
+  const { company, hierarchy, latestPerformance, performanceHistory } = data;
+
+  // For history chart
+  const historyCount = performanceHistory.length;
+  const hasHistoryTrend = historyCount >= 2;
+const outputs = performanceHistory
+  .map((p) => p.outputScore)
+  .filter((v) => Number.isFinite(v));
+
+const maxOutput =
+  outputs.length > 0 ? Math.max(...outputs) : 0;
 
   return (
     <main className="flex flex-col md:flex-row">
@@ -122,7 +141,7 @@ export default function CompanyPage() {
           <h2 className="text-lg font-semibold">Company Overview</h2>
           <p className="text-sm text-gray-600">
             This page shows the company&apos;s current leadership hierarchy
-            in the sidebar and its yearly performance below.
+            in the sidebar and its simulated yearly performance below.
           </p>
         </section>
 
@@ -183,6 +202,61 @@ export default function CompanyPage() {
             </Link>
           </div>
         </section>
+
+{/* PERFORMANCE HISTORY PANEL */}
+<section className="border border-gray-200 rounded-lg bg-gray-50 p-4 shadow-sm space-y-3">
+  <div className="flex items-baseline justify-between">
+    <h2 className="text-lg font-semibold">Performance History</h2>
+    {historyCount > 0 && (
+      <p className="text-xs text-gray-500">
+        Last {historyCount} year{historyCount === 1 ? '' : 's'}
+      </p>
+    )}
+  </div>
+
+  {historyCount === 0 || !hasHistoryTrend ? (
+    <p className="text-sm text-gray-600">
+      Not enough history yet — simulate more years to see a
+      performance trend.
+    </p>
+  ) : (
+    <div className="mt-1">
+      {/* fixed chart height in px */}
+      <div className="flex items-end gap-2" style={{ height: 120 }}>
+        {performanceHistory.map((row) => {
+          // make sure the value is usable
+          const rawOutput = Number.isFinite(row.outputScore)
+            ? row.outputScore
+            : 0;
+
+          // compute a bar height in px, with a minimum so it's visible
+          const max = maxOutput > 0 ? maxOutput : rawOutput || 1;
+          let barHeight = Math.round((rawOutput / max) * 110); // <= 110px
+
+          if (barHeight > 0 && barHeight < 8) barHeight = 8; // min visible
+          if (barHeight < 0) barHeight = 0;
+
+          return (
+            <div
+              key={row.year}
+              className="flex flex-col items-center flex-1"
+            >
+              <div
+                className="w-3 rounded-t bg-blue-500"
+                style={{ height: barHeight }}
+                aria-label={`Year ${row.year} output ${rawOutput.toFixed(1)}`}
+              />
+              <div className="mt-1 text-[10px] text-gray-600">
+                Y{row.year}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  )}
+</section>
+
       </section>
 
       {/* SIDEBAR: HIERARCHY */}
@@ -223,7 +297,7 @@ export default function CompanyPage() {
                         ({slot.person.age})
                       </span>
                     </p>
-                    <p className="mt-0.5 text[11px] text-gray-600">
+                    <p className="mt-0.5 text-[11px] text-gray-600">
                       Int {slot.person.intelligence} · Lead{' '}
                       {slot.person.leadership} · Disc{' '}
                       {slot.person.discipline} · Cha {slot.person.charisma}
