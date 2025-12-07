@@ -46,7 +46,7 @@ export async function GET(
     const worldId = world.id;
     const currentYear = world.currentYear;
 
-    // Offices + terms for this country
+    // Offices + terms for this country (with people, for leader lookup)
     const offices = await prisma.office.findMany({
       where: {
         worldId,
@@ -61,6 +61,24 @@ export async function GET(
         },
       },
     });
+
+    // Helper: who was leader in this country for a given year?
+    // We pick the first office with a term covering that year; in practice this
+    // should be the main "President of X" office, but if you add more, this
+    // still returns *a* leader for that year.
+    const getLeaderNameForYear = (year: number): string | null => {
+      for (const office of offices) {
+        const term = office.terms.find(
+          (t) =>
+            t.startYear <= year &&
+            (t.endYear === null || t.endYear >= year),
+        );
+        if (term) {
+          return term.person.name;
+        }
+      }
+      return null;
+    };
 
     const officePayload = offices.map((office) => {
       const currentTerm =
@@ -91,12 +109,71 @@ export async function GET(
       };
     });
 
-    // Performance summary
+    // Performance summary (per-company / per-industry breakdown, current year)
     const performance = await getCountryPerformanceSummary(
       worldId,
       countryId,
       currentYear,
     );
+
+    // ===== COUNTRY HISTORY (CountryYearPerformance) =====
+    // We want: for each year, this country's totalScore, rank, isChampion, leaderName.
+    // Rank is computed per-year across all countries in that world.
+    const allPerf = await prisma.countryYearPerformance.findMany({
+      where: {
+        worldId,
+      },
+      orderBy: [
+        { year: 'asc' },
+        { totalScore: 'desc' },
+        { countryId: 'asc' },
+      ],
+    });
+
+    type PerfRow = (typeof allPerf)[number];
+
+    const byYear = new Map<number, PerfRow[]>();
+
+    for (const row of allPerf) {
+      const arr = byYear.get(row.year) ?? [];
+      arr.push(row);
+      byYear.set(row.year, arr);
+    }
+
+    const history: {
+      year: number;
+      totalScore: number;
+      rank: number | null;
+      isChampion: boolean;
+      leaderName: string | null;
+    }[] = [];
+
+    const sortedYears = Array.from(byYear.keys()).sort((a, b) => a - b);
+
+    for (const year of sortedYears) {
+      const rows = byYear.get(year)!;
+
+      // Sort rows within the year by totalScore desc, then countryId asc for tie-breaks
+      rows.sort(
+        (a, b) =>
+          b.totalScore - a.totalScore || a.countryId - b.countryId,
+      );
+
+      rows.forEach((row, idx) => {
+        if (row.countryId !== countryId) return;
+
+        const rank = idx + 1;
+        const leaderName = getLeaderNameForYear(year);
+
+        history.push({
+          year,
+          totalScore: row.totalScore,
+          rank,
+          isChampion: row.isChampion,
+          leaderName,
+        });
+      });
+    }
 
     return NextResponse.json(
       {
@@ -106,6 +183,7 @@ export async function GET(
         worldName: world.name,
         offices: officePayload,
         performance,
+        history,
       },
       { status: 200 },
     );
