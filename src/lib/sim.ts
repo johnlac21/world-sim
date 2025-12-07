@@ -1261,6 +1261,9 @@ export async function tickYear(worldId: number) {
   // ---------- COMPANY YEARLY PERFORMANCE (v1) ----------
   await computeCompanyYearPerformance(worldId, newYear);
 
+  // ---------- COUNTRY YEARLY PERFORMANCE (v1) ----------
+  await computeCountryYearPerformance(worldId, newYear);
+
   // (optional) return a small summary to the caller
   return {
     newYear,
@@ -1420,7 +1423,6 @@ async function computeCompanyYearPerformance(
     });
   }
 
-
   if (upserts.length === 0) {
     console.log('[PERF] no rows to upsert, done');
     return;
@@ -1454,5 +1456,117 @@ async function computeCompanyYearPerformance(
       }),
     ),
   );
+}
 
+// ============================================================================
+// COUNTRY YEARLY PERFORMANCE (v1)
+// ============================================================================
+async function computeCountryYearPerformance(
+  worldId: number,
+  year: number,
+): Promise<void> {
+  console.log('[PERF] computeCountryYearPerformance start', { worldId, year });
+
+  // Pull company performances for this world/year + their countries
+  const companyPerf = await prisma.companyYearPerformance.findMany({
+    where: { worldId, year },
+    include: {
+      company: {
+        select: {
+          countryId: true,
+        },
+      },
+    },
+  });
+
+  if (companyPerf.length === 0) {
+    console.log('[PERF] no company performances for world/year, skipping country perf');
+    return;
+  }
+
+  // Aggregate company output per country
+  const companyScoreByCountry = new Map<number, number>();
+
+  for (const row of companyPerf) {
+    const countryId = row.company.countryId;
+    if (!countryId) continue; // defensive
+
+    const prev = companyScoreByCountry.get(countryId) ?? 0;
+    companyScoreByCountry.set(countryId, prev + row.outputScore);
+  }
+
+  if (companyScoreByCountry.size === 0) {
+    console.log('[PERF] no country scores derived, skipping');
+    return;
+  }
+
+  // Remove any existing data for this world/year (we recompute from scratch)
+  await prisma.countryYearPerformance.deleteMany({
+    where: { worldId, year },
+  });
+
+  // Build rows to insert
+  const rowsToInsert = Array.from(companyScoreByCountry.entries()).map(
+    ([countryId, companyScore]) => {
+      const governmentScore = 0; // placeholder
+      const populationScore = 0; // placeholder
+      const totalScore = companyScore + governmentScore + populationScore;
+
+      return {
+        worldId,
+        countryId,
+        year,
+        companyScore,
+        governmentScore,
+        populationScore,
+        totalScore,
+        isChampion: false, // will set below
+      };
+    },
+  );
+
+  await prisma.countryYearPerformance.createMany({
+    data: rowsToInsert,
+  });
+
+  // Now select champion for this world/year
+  const rows = await prisma.countryYearPerformance.findMany({
+    where: { worldId, year },
+  });
+
+  if (rows.length === 0) {
+    console.log('[PERF] no CountryYearPerformance rows after createMany, skipping champion');
+    return;
+  }
+
+  // Use typeof rows[0] to avoid needing the explicit Prisma type import
+  const winner = rows.reduce<typeof rows[0] | null>((best, row) => {
+    if (!best) return row;
+    if (row.totalScore > best.totalScore) return row;
+    if (row.totalScore === best.totalScore && row.countryId < best.countryId) {
+      // deterministic tie-breaker: lowest countryId wins
+      return row;
+    }
+    return best;
+  }, null);
+
+  // Clear champion flags
+  await prisma.countryYearPerformance.updateMany({
+    where: { worldId, year },
+    data: { isChampion: false },
+  });
+
+  if (winner) {
+    await prisma.countryYearPerformance.updateMany({
+      where: { worldId, year, countryId: winner.countryId },
+      data: { isChampion: true },
+    });
+  }
+
+  console.log('[PERF] computeCountryYearPerformance done', {
+    worldId,
+    year,
+    countries: rows.length,
+    championCountryId: winner?.countryId ?? null,
+  });
 }

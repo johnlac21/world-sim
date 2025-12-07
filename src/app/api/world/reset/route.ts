@@ -139,8 +139,9 @@ export async function POST() {
     await prisma.enrollment.deleteMany();
     await prisma.employment.deleteMany();
     await prisma.companyPosition.deleteMany();
-    // NEW: clear yearly performance before deleting companies/world
+    // clear yearly performance before deleting companies/world
     await prisma.companyYearPerformance.deleteMany();
+    await prisma.countryYearPerformance.deleteMany();
     await prisma.term.deleteMany();
     await prisma.school.deleteMany();
     await prisma.company.deleteMany();

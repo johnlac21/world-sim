@@ -149,6 +149,10 @@ async function main() {
   await prisma.employment.deleteMany();
   await prisma.companyPosition.deleteMany();
   await prisma.term.deleteMany();
+
+  await prisma.companyYearPerformance.deleteMany();
+  await prisma.countryYearPerformance.deleteMany();
+
   await prisma.school.deleteMany();
   await prisma.company.deleteMany();
   await prisma.office.deleteMany();

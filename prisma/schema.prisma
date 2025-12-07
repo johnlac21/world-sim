@@ -20,7 +20,8 @@ model World {
   schools   School[]
   offices   Office[]
 
-  companyPerformances CompanyYearPerformance[]
+  companyPerformances  CompanyYearPerformance[]
+  countryPerformances  CountryYearPerformance[]
 
   // One-to-one: which country the user controls
   controlledCountryId Int?     @unique
@@ -44,6 +45,8 @@ model Country {
 
   // Back-rel for controlledCountry (no fields here, FK lives on World)
   controlledByWorld World? @relation("ControlledCountry")
+
+  performances CountryYearPerformance[]
 }
 
 model Person {
@@ -344,4 +347,29 @@ model CompanyYearPerformance {
   createdAt DateTime @default(now())
 
   @@unique([companyId, year])
+}
+
+model CountryYearPerformance {
+  id        Int  @id @default(autoincrement())
+
+  world   World   @relation(fields: [worldId], references: [id])
+  worldId Int
+
+  country   Country @relation(fields: [countryId], references: [id])
+  countryId Int
+
+  year Int
+
+  // Components (v1: only companyScore is real; others are placeholders)
+  companyScore    Float @default(0)
+  governmentScore Float @default(0)
+  populationScore Float @default(0)
+
+  totalScore Float   @default(0)
+  isChampion Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@unique([worldId, countryId, year])
+  @@index([worldId, year])
 }
