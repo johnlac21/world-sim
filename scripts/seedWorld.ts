@@ -59,6 +59,54 @@ const BASE_INDUSTRY_ROLES: { name: string; rank: number }[] = [
   { name: 'Worker', rank: 9 },
 ];
 
+const BASE_INDUSTRY_ROLES: { name: string; rank: number }[] = [
+  { name: 'President', rank: 0 },
+  { name: 'Vice President', rank: 1 },
+  { name: 'Senior Manager', rank: 2 },
+  { name: 'Manager', rank: 3 },
+  { name: 'Associate Manager', rank: 4 },
+  { name: 'Lead Analyst', rank: 5 },
+  { name: 'Analyst', rank: 6 },
+  { name: 'Junior Analyst', rank: 7 },
+  { name: 'Trainee', rank: 8 },
+  { name: 'Worker', rank: 9 },
+];
+
+// Standard cabinet offices per country (same as reset route)
+const CABINET_OFFICES = [
+  {
+    name: 'Minister of Economy',
+    level: 'Cabinet',
+    termLength: 4,
+    prestige: 65,
+  },
+  {
+    name: 'Minister of Education',
+    level: 'Cabinet',
+    termLength: 4,
+    prestige: 60,
+  },
+  {
+    name: 'Minister of Industry',
+    level: 'Cabinet',
+    termLength: 4,
+    prestige: 62,
+  },
+  {
+    name: 'Minister of Health',
+    level: 'Cabinet',
+    termLength: 4,
+    prestige: 58,
+  },
+  {
+    name: 'Minister of Infrastructure',
+    level: 'Cabinet',
+    termLength: 4,
+    prestige: 55,
+  },
+];
+
+
 function randInt(min: number, max: number) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
@@ -322,6 +370,25 @@ async function main() {
       }),
     ),
   );
+
+  // Cabinet-level offices per country (standardized)
+  await prisma.$transaction(
+    countries.flatMap((country) =>
+      CABINET_OFFICES.map((cfg) =>
+        prisma.office.create({
+          data: {
+            name: `${cfg.name} of ${country.name}`,
+            level: cfg.level,
+            termLength: cfg.termLength,
+            prestige: cfg.prestige,
+            worldId: world.id,
+            countryId: country.id,
+          },
+        }),
+      ),
+    ),
+  );
+
 
   const companiesByCountry = new Map<number, (typeof companies)[number][]>();
   for (const country of countries) {

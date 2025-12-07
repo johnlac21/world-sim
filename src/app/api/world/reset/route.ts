@@ -56,6 +56,40 @@ const BASE_INDUSTRY_ROLES: { name: string; rank: number }[] = [
   { name: 'Worker', rank: 9 },
 ];
 
+// Standard cabinet offices per country (government hierarchy v1)
+const CABINET_OFFICES = [
+  {
+    name: 'Minister of Economy',
+    level: 'Cabinet',
+    termLength: 4,
+    prestige: 65,
+  },
+  {
+    name: 'Minister of Education',
+    level: 'Cabinet',
+    termLength: 4,
+    prestige: 60,
+  },
+  {
+    name: 'Minister of Industry',
+    level: 'Cabinet',
+    termLength: 4,
+    prestige: 62,
+  },
+  {
+    name: 'Minister of Health',
+    level: 'Cabinet',
+    termLength: 4,
+    prestige: 58,
+  },
+  {
+    name: 'Minister of Infrastructure',
+    level: 'Cabinet',
+    termLength: 4,
+    prestige: 55,
+  },
+];
+
 function randInt(min: number, max: number) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
@@ -333,7 +367,8 @@ export async function POST() {
       );
     }
 
-    // ----- OFFICES (WORLD + COUNTRY LEADERS) -----
+    // ----- OFFICES (WORLD + COUNTRY LEADERS + CABINET) -----
+    // World leader
     await prisma.office.create({
       data: {
         name: 'World President',
@@ -345,6 +380,7 @@ export async function POST() {
       },
     });
 
+    // Country presidents
     await prisma.$transaction(
       countries.map((country) =>
         prisma.office.create({
@@ -357,6 +393,24 @@ export async function POST() {
             countryId: country.id,
           },
         }),
+      ),
+    );
+
+    // Cabinet-level offices per country (standardized set)
+    await prisma.$transaction(
+      countries.flatMap((country) =>
+        CABINET_OFFICES.map((cfg) =>
+          prisma.office.create({
+            data: {
+              name: `${cfg.name} of ${country.name}`,
+              level: cfg.level, // "Cabinet"
+              termLength: cfg.termLength,
+              prestige: cfg.prestige,
+              worldId: world.id,
+              countryId: country.id,
+            },
+          }),
+        ),
       ),
     );
 
