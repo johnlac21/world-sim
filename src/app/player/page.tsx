@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { TalentSearchModal } from '@/components/TalentSearchModal';
 
 type IndustryRow = {
   industry: string;
@@ -51,6 +52,9 @@ type PlayerCountryPayload = {
   offices: GovernmentOfficeRow[];
   // New: optional performance summary
   performance?: CountryPerformanceSummary | null;
+  // NEW: ids so we can scope Talent Search
+  worldId?: number;
+  countryId?: number;
 };
 
 type OfficeCandidate = {
@@ -66,13 +70,16 @@ export default function PlayerCountryPage() {
   const [data, setData] = useState<PlayerCountryPayload | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // NEW: modal + candidates state
+  // office reassignment modal state
   const [selectedOffice, setSelectedOffice] =
     useState<GovernmentOfficeRow | null>(null);
   const [candidates, setCandidates] = useState<OfficeCandidate[] | null>(null);
   const [modalError, setModalError] = useState<string | null>(null);
   const [modalLoading, setModalLoading] = useState(false);
   const [appointing, setAppointing] = useState(false);
+
+  // Talent Search modal state
+  const [showTalentSearch, setShowTalentSearch] = useState(false);
 
   const load = async () => {
     try {
@@ -180,7 +187,7 @@ export default function PlayerCountryPage() {
         <p className="text-sm text-gray-600">World: {data.worldName}</p>
       </header>
 
-      {/* Basic overview (existing) */}
+      {/* Basic overview */}
       <section>
         <h2 className="text-xl font-semibold">Overview</h2>
         <ul className="list-disc ml-6 text-sm">
@@ -192,7 +199,25 @@ export default function PlayerCountryPage() {
         </ul>
       </section>
 
-      {/* Government overview card (NEW) */}
+      {/* Talent & Scouting entry point */}
+      <section className="border rounded-lg p-4 bg-white shadow-sm flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-semibold">Talent &amp; Scouting</h2>
+          <p className="text-sm text-gray-600">
+            Search your population (and beyond) by age, stats, and industry
+            experience to find candidates for offices and company roles.
+          </p>
+        </div>
+        <button
+          className="px-3 py-1.5 rounded border border-blue-600 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 disabled:opacity-50"
+          onClick={() => setShowTalentSearch(true)}
+          disabled={!data.worldId}
+        >
+          Open Talent Search
+        </button>
+      </section>
+
+      {/* Government overview card */}
       <section className="border rounded-lg p-4 bg-white shadow-sm space-y-4">
         <div className="flex items-baseline justify-between">
           <h2 className="text-xl font-semibold">Government</h2>
@@ -270,7 +295,7 @@ export default function PlayerCountryPage() {
         )}
       </section>
 
-      {/* Country performance panel (existing NEW) */}
+      {/* Country performance panel */}
       <section className="border rounded-lg p-4 bg-white shadow-sm space-y-4">
         <h2 className="text-xl font-semibold">Country Performance</h2>
 
@@ -488,6 +513,21 @@ export default function PlayerCountryPage() {
             </p>
           </div>
         </div>
+      )}
+
+      {/* Talent Search Modal (global scouting) */}
+      {data.worldId && (
+        <TalentSearchModal
+          worldId={data.worldId}
+          defaultCountryId={data.countryId}
+          isOpen={showTalentSearch}
+          onClose={() => setShowTalentSearch(false)}
+          onSelectPerson={(person) => {
+            // For now, just open their profile in a new tab
+            window.open(`/person/${person.id}`, '_blank');
+          }}
+          selectLabel="View profile"
+        />
       )}
 
       {/* Later: policy sliders, budgets, etc. */}

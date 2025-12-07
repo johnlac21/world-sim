@@ -1,4 +1,3 @@
-// app/api/player-country/route.ts
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getCountryPerformanceSummary } from '@/lib/performance';
@@ -182,6 +181,9 @@ export async function GET() {
         unemployed,
         offices: officePayload,
         performance,
+        // NEW: ids for Talent Search
+        worldId,
+        countryId,
       },
       { status: 200 },
     );

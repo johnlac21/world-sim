@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import { TalentSearchModal } from '@/components/TalentSearchModal';
 
 type HierarchyPerson = {
   id: number;
@@ -103,6 +104,9 @@ export default function CompanyPage() {
   const [roleLoading, setRoleLoading] = useState<Record<number, boolean>>({});
   const [savingRole, setSavingRole] = useState<Record<number, boolean>>({});
   const [uiMessage, setUiMessage] = useState<string | null>(null);
+
+  // NEW: talent search modal state
+  const [showTalentSearch, setShowTalentSearch] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -563,15 +567,24 @@ export default function CompanyPage() {
             Company Hierarchy
           </h2>
 
-          {isEditable && (
+          <div className="flex items-center gap-1">
+            {isEditable && (
+              <button
+                type="button"
+                onClick={() => setEditMode((v) => !v)}
+                className="rounded-full border border-gray-300 bg-white px-2 py-0.5 text-[11px] font-medium text-gray-700 hover:bg-gray-100"
+              >
+                {editMode ? 'Done' : 'Edit'}
+              </button>
+            )}
             <button
               type="button"
-              onClick={() => setEditMode((v) => !v)}
-              className="ml-2 rounded-full border border-gray-300 bg-white px-2 py-0.5 text-[11px] font-medium text-gray-700 hover:bg-gray-100"
+              onClick={() => setShowTalentSearch(true)}
+              className="rounded-full border border-blue-500 bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700 hover:bg-blue-100"
             >
-              {editMode ? 'Done' : 'Edit'}
+              Talent
             </button>
-          )}
+          </div>
         </div>
 
         <p className="text-xs text-gray-500 mb-3">
@@ -732,6 +745,23 @@ export default function CompanyPage() {
           </ul>
         )}
       </aside>
+
+      {/* TALENT SEARCH MODAL */}
+      {showTalentSearch && (
+        <TalentSearchModal
+          worldId={company.worldId}
+          defaultCountryId={company.countryId}
+          defaultIndustry={company.industry}
+          isOpen={showTalentSearch}
+          onClose={() => setShowTalentSearch(false)}
+          onSelectPerson={(person) => {
+            // For now, just open their profile in a new tab.
+            // Later you can wire this into a "hire then assign" flow.
+            window.open(`/person/${person.id}`, '_blank');
+          }}
+          selectLabel="View profile"
+        />
+      )}
     </main>
   );
 }

@@ -183,14 +183,9 @@ export default function PersonPage() {
   return (
     <main className="p-4 space-y-6">
       <header className="space-y-1">
-        <div className="flex gap-4 text-sm">
-          <Link href="/" className="text-blue-600 underline">
-            ← World
-          </Link>
-          <Link href="/player" className="text-blue-600 underline">
-            Player
-          </Link>
-        </div>
+        <Link href="/" className="text-blue-600 underline text-sm">
+          ← Back to world
+        </Link>
         <h1 className="text-2xl font-bold">
           {data.name}{' '}
           {data.isPlayer && (
