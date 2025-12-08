@@ -1519,13 +1519,18 @@ export async function tickYear(worldId: number) {
 
 
 // ============================================================================
-// COMPANY YEARLY PERFORMANCE (v1)
+// COMPANY YEARLY PERFORMANCE (v1) + PERSON YEARLY PERFORMANCE
 // ============================================================================
 async function computeCompanyYearPerformance(
   worldId: number,
   year: number,
 ): Promise<void> {
   console.log('[PERF] computeCompanyYearPerformance start', { worldId, year });
+
+  // Clear any existing person-year rows for this world/year so we can regenerate
+  await prisma.personYearPerformance.deleteMany({
+    where: { worldId, year },
+  });
 
   // All companies in this world
   const companies = await prisma.company.findMany({
@@ -1562,7 +1567,8 @@ async function computeCompanyYearPerformance(
     positionsByCompany.set(pos.companyId, arr);
   }
 
-  // v1 role power: single aggregate metric per person
+  // v1: reuse a single base "talent" metric, then derive leadership/reliability
+  // around it, and apply rank multipliers.
   function rolePower(p: Person): number {
     return (
       0.35 * p.intelligence +
@@ -1580,7 +1586,71 @@ async function computeCompanyYearPerformance(
     return sum / values.length;
   }
 
-  const upserts: {
+  type PersonPerfAccumulator = {
+    worldId: number;
+    personId: number;
+    companyId: number;
+    industry: string;
+    year: number;
+    talentScore: number;
+    leadershipScore: number;
+    reliabilityScore: number;
+    contributionScore: number;
+  };
+
+  // Aggregate per person (in practice there should be at most one position per person)
+  const personPerfByPersonId = new Map<number, PersonPerfAccumulator>();
+
+  function computePersonContribution(
+    person: Person,
+    roleRank: number,
+  ): {
+    talentScore: number;
+    leadershipScore: number;
+    reliabilityScore: number;
+    contributionScore: number;
+    tier: 'exec' | 'manager' | 'contributor';
+  } {
+    // Base components
+    const talentScore = rolePower(person);
+    const leadershipScore = person.leadership;
+    const reliabilityScore = person.discipline;
+
+    // Rank-based multiplier + tier bucket
+    let rankMultiplier = 1.0;
+    let tier: 'exec' | 'manager' | 'contributor';
+
+    if (roleRank <= 1) {
+      // President / VP
+      rankMultiplier = 1.3;
+      tier = 'exec';
+    } else if (roleRank >= 2 && roleRank <= 4) {
+      // Senior Manager / Manager / Associate Manager
+      rankMultiplier = 1.1;
+      tier = 'manager';
+    } else {
+      // Lead Analyst → Worker (and any other lower ranks)
+      rankMultiplier = 0.9;
+      tier = 'contributor';
+    }
+
+    const base =
+      0.5 * talentScore +
+      0.3 * leadershipScore +
+      0.2 * reliabilityScore;
+
+    const contributionScore = base * rankMultiplier;
+
+    return {
+      talentScore,
+      leadershipScore,
+      reliabilityScore,
+      contributionScore,
+      tier,
+    };
+  }
+
+  const companyUpserts: {
     companyId: number;
     worldId: number;
     year: number;
@@ -1595,7 +1665,7 @@ async function computeCompanyYearPerformance(
 
     if (companyPositions.length === 0) {
       // No one in the ladder → zero performance
-      upserts.push({
+      companyUpserts.push({
         companyId: company.id,
         worldId,
         year,
@@ -1607,45 +1677,70 @@ async function computeCompanyYearPerformance(
       continue;
     }
 
-    const execPowers: number[] = [];
-    const managerPowers: number[] = [];
-    const contributorPowers: number[] = [];
-    const allPowers: number[] = [];
+    const execContribs: number[] = [];
+    const managerContribs: number[] = [];
+    const contributorContribs: number[] = [];
 
     for (const pos of companyPositions) {
       const person = pos.person as Person | null;
       const role = pos.role as IndustryRole | null;
       if (!person || !role) continue;
 
-      const power = rolePower(person);
-      allPowers.push(power);
+      const {
+        talentScore,
+        leadershipScore,
+        reliabilityScore,
+        contributionScore,
+        tier,
+      } = computePersonContribution(person, role.rank);
 
-      if (role.rank <= 1) {
-        // President / VP (ranks 0–1)
-        execPowers.push(power);
-      } else if (role.rank >= 2 && role.rank <= 4) {
-        // Manager tier (ranks 2–4)
-        managerPowers.push(power);
-      } else if (role.rank >= 5 && role.rank <= 9) {
-        // Contributor tier (ranks 5–9)
-        contributorPowers.push(power);
+      // Bucket contribution for company-tier aggregation
+      if (tier === 'exec') {
+        execContribs.push(contributionScore);
+      } else if (tier === 'manager') {
+        managerContribs.push(contributionScore);
+      } else {
+        contributorContribs.push(contributionScore);
       }
-      // Ranks outside 0–9 are ignored for tiering, but still go into allPowers.
+
+      // Aggregate into per-person yearly performance map
+      const existing = personPerfByPersonId.get(person.id);
+      if (!existing) {
+        personPerfByPersonId.set(person.id, {
+          worldId,
+          personId: person.id,
+          companyId: company.id,
+          industry: company.industry,
+          year,
+          talentScore,
+          leadershipScore,
+          reliabilityScore,
+          contributionScore,
+        });
+      } else {
+        existing.talentScore += talentScore;
+        existing.leadershipScore += leadershipScore;
+        existing.reliabilityScore += reliabilityScore;
+        existing.contributionScore += contributionScore;
+      }
     }
 
-    let execScore = average(execPowers);
-    let managerScore = average(managerPowers);
-    let contributorScore = average(contributorPowers);
+    let execScore = average(execContribs);
+    let managerScore = average(managerContribs);
+    let contributorScore = average(contributorContribs);
 
-    // Fallback: if tier buckets ended up empty but the company *does* have positions,
-    // use overall average power so we don't silently get 0.0.
+    const anyContribs = [
+      ...execContribs,
+      ...managerContribs,
+      ...contributorContribs,
+    ];
     if (
-      execPowers.length === 0 &&
-      managerPowers.length === 0 &&
-      contributorPowers.length === 0 &&
-      allPowers.length > 0
+      execContribs.length === 0 &&
+      managerContribs.length === 0 &&
+      contributorContribs.length === 0 &&
+      anyContribs.length > 0
     ) {
-      const overall = average(allPowers);
+      const overall = average(anyContribs);
       execScore = overall;
       managerScore = overall;
       contributorScore = overall;
@@ -1654,11 +1749,7 @@ async function computeCompanyYearPerformance(
     const outputScore =
       0.5 * execScore + 0.3 * managerScore + 0.2 * contributorScore;
 
-    // Map v0 component fields to tier scores so they’re not meaningless:
-    // - talentScore      → execScore
-    // - leadershipScore  → managerScore
-    // - reliabilityScore → contributorScore
-    upserts.push({
+    companyUpserts.push({
       companyId: company.id,
       worldId,
       year,
@@ -1669,14 +1760,14 @@ async function computeCompanyYearPerformance(
     });
   }
 
-  if (upserts.length === 0) {
-    console.log('[PERF] no rows to upsert, done');
+  if (companyUpserts.length === 0) {
+    console.log('[PERF] no company rows to upsert, done');
     return;
   }
 
   // Upsert per (company, year)
   await Promise.all(
-    upserts.map((row) =>
+    companyUpserts.map((row) =>
       prisma.companyYearPerformance.upsert({
         where: {
           companyId_year: {
@@ -1702,7 +1793,23 @@ async function computeCompanyYearPerformance(
       }),
     ),
   );
+
+  // Insert person-year rows in bulk
+  const personRows = Array.from(personPerfByPersonId.values());
+  if (personRows.length > 0) {
+    await prisma.personYearPerformance.createMany({
+      data: personRows,
+    });
+  }
+
+  console.log('[PERF] computeCompanyYearPerformance done', {
+    worldId,
+    year,
+    companies: companyUpserts.length,
+    personRows: personRows.length,
+  });
 }
+
 
 // How strongly governmentScore affects country totalScore.
 // Interpreted as: each point of gov score (0–100) is worth this many "output" points.

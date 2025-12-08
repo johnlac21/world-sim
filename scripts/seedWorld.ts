@@ -196,6 +196,11 @@ async function main() {
   await prisma.enrollment.deleteMany();
   await prisma.employment.deleteMany();
   await prisma.companyPosition.deleteMany();
+
+  // NEW
+  await prisma.personYearPerformance.deleteMany();
+  await prisma.playerUniversityDecision.deleteMany();
+
   await prisma.term.deleteMany();
 
   await prisma.companyYearPerformance.deleteMany();
@@ -208,7 +213,7 @@ async function main() {
   await prisma.country.deleteMany();
   await prisma.world.deleteMany();
   await prisma.industryRole.deleteMany();
-  await prisma.playerUniversityDecision.deleteMany();
+
 
   const world = await prisma.world.create({
     data: {

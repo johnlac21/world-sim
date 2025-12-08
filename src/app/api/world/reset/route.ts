@@ -168,14 +168,21 @@ function computeRoleScore(p: Person, roleRank: number): number {
 export async function POST() {
   try {
     // wipe old data in dependency-safe order
+    // wipe old data in dependency-safe order
     await prisma.friendship?.deleteMany?.().catch(() => {});
     await prisma.marriage.deleteMany();
     await prisma.enrollment.deleteMany();
     await prisma.employment.deleteMany();
     await prisma.companyPosition.deleteMany();
+
+    // NEW: clear per-person + player decisions before people/world/country
+    await prisma.personYearPerformance.deleteMany();
+    await prisma.playerUniversityDecision.deleteMany();
+
     // clear yearly performance before deleting companies/world
     await prisma.companyYearPerformance.deleteMany();
     await prisma.countryYearPerformance.deleteMany();
+
     await prisma.term.deleteMany();
     await prisma.school.deleteMany();
     await prisma.company.deleteMany();
@@ -184,6 +191,7 @@ export async function POST() {
     await prisma.country.deleteMany();
     await prisma.world.deleteMany();
     await prisma.industryRole.deleteMany();
+
 
     // ----- WORLD -----
     const world = await prisma.world.create({

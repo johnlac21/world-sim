@@ -21,6 +21,8 @@ model World {
 
   companyPerformances CompanyYearPerformance[]
   countryPerformances CountryYearPerformance[]
+  // NEW: per-person yearly performance rows
+  personPerformances  PersonYearPerformance[]
 
   // NEW: player university decisions for this world
   playerUniversityDecisions PlayerUniversityDecision[]
@@ -148,6 +150,9 @@ model Person {
   terms    Term[] // offices held over time
   prestige Int    @default(0)
 
+  // NEW: per-person yearly performance rows
+  performances PersonYearPerformance[]
+
   playerUniversityDecisions PlayerUniversityDecision[]
 
   createdAt DateTime @default(now())
@@ -172,7 +177,9 @@ model Company {
   // Industry hierarchy positions inside this company
   positions CompanyPosition[]
 
-  performances CompanyYearPerformance[]
+  performances       CompanyYearPerformance[]
+  // NEW: per-person yearly performance rows for this company
+  personPerformances PersonYearPerformance[]
 
   createdAt DateTime @default(now())
 }
@@ -381,6 +388,43 @@ model CountryYearPerformance {
 
   @@unique([worldId, countryId, year])
   @@index([worldId, year])
+}
+
+// NEW: per-person yearly contributions, populated alongside CompanyYearPerformance
+model PersonYearPerformance {
+  id Int @id @default(autoincrement())
+
+  world   World  @relation(fields: [worldId], references: [id])
+  worldId Int
+
+  person   Person @relation(fields: [personId], references: [id])
+  personId Int
+
+  company   Company @relation(fields: [companyId], references: [id])
+  companyId Int
+
+  // World year this performance is for
+  year Int
+
+  // Snapshot of the person's company industry in that year
+  industry String
+
+  // Component scores
+  talentScore      Float
+  leadershipScore  Float
+  reliabilityScore Float
+
+  // Rank-weighted combined contribution for this person-year
+  contributionScore Float
+
+  createdAt DateTime @default(now())
+
+  // One row per (world, person, year)
+  @@unique([worldId, personId, year])
+
+  // Helpful indexes for queries
+  @@index([worldId, year])
+  @@index([companyId, year])
 }
 
 model PlayerUniversityDecision {
