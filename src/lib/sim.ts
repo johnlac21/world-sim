@@ -48,6 +48,9 @@ const JOB_LADDER = [
   'VP',
 ];
 
+const UNIVERSITY_SLOTS_PER_SCHOOL = 50; // or 100; tweak as you like
+
+
 function pickRandom<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
@@ -669,6 +672,7 @@ export async function tickYear(worldId: number) {
   if (!world) throw new Error(`World ${worldId} not found`);
 
   const newYear = world.currentYear + 1;
+  const playerCountryId = world.controlledCountryId ?? null;
 
   // quick lookup for living people at start of tick
   const personById = new Map<number, (typeof world.people)[number]>();
@@ -764,41 +768,83 @@ export async function tickYear(worldId: number) {
 
       const babyStats: PersonStats = {
         // Cognitive
-        intelligence: statFromParents(parent1.intelligence, p2 ? p2.intelligence : null),
-        memory:       statFromParents(parent1.memory,       p2 ? p2.memory       : null),
-        creativity:   statFromParents(parent1.creativity,   p2 ? p2.creativity   : null),
-        discipline:   statFromParents(parent1.discipline,   p2 ? p2.discipline   : null),
-        judgment:     statFromParents(parent1.judgment,     p2 ? p2.judgment     : null),
-        adaptability: statFromParents(parent1.adaptability, p2 ? p2.adaptability : null),
+        intelligence: statFromParents(
+          parent1.intelligence,
+          p2 ? p2.intelligence : null,
+        ),
+        memory: statFromParents(parent1.memory, p2 ? p2.memory : null),
+        creativity: statFromParents(
+          parent1.creativity,
+          p2 ? p2.creativity : null,
+        ),
+        discipline: statFromParents(
+          parent1.discipline,
+          p2 ? p2.discipline : null,
+        ),
+        judgment: statFromParents(parent1.judgment, p2 ? p2.judgment : null),
+        adaptability: statFromParents(
+          parent1.adaptability,
+          p2 ? p2.adaptability : null,
+        ),
 
         // Social / Influence
-        charisma:      statFromParents(parent1.charisma,      p2 ? p2.charisma      : null),
-        leadership:    statFromParents(parent1.leadership,    p2 ? p2.leadership    : null),
-        empathy:       statFromParents(parent1.empathy,       p2 ? p2.empathy       : null),
-        communication: statFromParents(parent1.communication, p2 ? p2.communication : null),
-        confidence:    statFromParents(parent1.confidence,    p2 ? p2.confidence    : null),
-        negotiation:   statFromParents(parent1.negotiation,   p2 ? p2.negotiation   : null),
+        charisma: statFromParents(parent1.charisma, p2 ? p2.charisma : null),
+        leadership: statFromParents(
+          parent1.leadership,
+          p2 ? p2.leadership : null,
+        ),
+        empathy: statFromParents(parent1.empathy, p2 ? p2.empathy : null),
+        communication: statFromParents(
+          parent1.communication,
+          p2 ? p2.communication : null,
+        ),
+        confidence: statFromParents(
+          parent1.confidence,
+          p2 ? p2.confidence : null,
+        ),
+        negotiation: statFromParents(
+          parent1.negotiation,
+          p2 ? p2.negotiation : null,
+        ),
 
         // Physical
-        strength:    statFromParents(parent1.strength,    p2 ? p2.strength    : null),
-        endurance:   statFromParents(parent1.endurance,   p2 ? p2.endurance   : null),
-        athleticism: statFromParents(parent1.athleticism, p2 ? p2.athleticism : null),
-        vitality:    statFromParents(parent1.vitality,    p2 ? p2.vitality    : null),
-        reflexes:    statFromParents(parent1.reflexes,    p2 ? p2.reflexes    : null),
-        appearance:  statFromParents(parent1.appearance,  p2 ? p2.appearance  : null),
+        strength: statFromParents(parent1.strength, p2 ? p2.strength : null),
+        endurance: statFromParents(
+          parent1.endurance,
+          p2 ? p2.endurance : null,
+        ),
+        athleticism: statFromParents(
+          parent1.athleticism,
+          p2 ? p2.athleticism : null,
+        ),
+        vitality: statFromParents(parent1.vitality, p2 ? p2.vitality : null),
+        reflexes: statFromParents(parent1.reflexes, p2 ? p2.reflexes : null),
+        appearance: statFromParents(
+          parent1.appearance,
+          p2 ? p2.appearance : null,
+        ),
 
         // Personality
-        ambition:      statFromParents(parent1.ambition,      p2 ? p2.ambition      : null),
-        integrity:     statFromParents(parent1.integrity,     p2 ? p2.integrity     : null),
-        riskTaking:    statFromParents(parent1.riskTaking,    p2 ? p2.riskTaking    : null),
-        patience:      statFromParents(parent1.patience,      p2 ? p2.patience      : null),
-        agreeableness: statFromParents(parent1.agreeableness, p2 ? p2.agreeableness : null),
-        stability:     statFromParents(parent1.stability,     p2 ? p2.stability     : null),
+        ambition: statFromParents(parent1.ambition, p2 ? p2.ambition : null),
+        integrity: statFromParents(parent1.integrity, p2 ? p2.integrity : null),
+        riskTaking: statFromParents(
+          parent1.riskTaking,
+          p2 ? p2.riskTaking : null,
+        ),
+        patience: statFromParents(parent1.patience, p2 ? p2.patience : null),
+        agreeableness: statFromParents(
+          parent1.agreeableness,
+          p2 ? p2.agreeableness : null,
+        ),
+        stability: statFromParents(
+          parent1.stability,
+          p2 ? p2.stability : null,
+        ),
       };
 
-      const babyOverall   = computeOverallRating(babyStats);
-      const babyDevStyle  = generateDevelopmentStyle();
-      const babyPeakAge   = generatePeakAge(babyDevStyle);
+      const babyOverall = computeOverallRating(babyStats);
+      const babyDevStyle = generateDevelopmentStyle();
+      const babyPeakAge = generatePeakAge(babyDevStyle);
       const babyPotential = generatePotentialOverall(babyOverall);
 
       const { archetype: babyArchetype, subtype: babySubtype } =
@@ -841,6 +887,32 @@ export async function tickYear(worldId: number) {
     schoolsByCountryLevel.set(key, arr);
   }
 
+  // University slots per country based on number of universities
+  const universitySlotsByCountry = new Map<number, number>();
+  for (const s of schools) {
+    if (s.level !== 'University') continue;
+    const prev = universitySlotsByCountry.get(s.countryId) ?? 0;
+    universitySlotsByCountry.set(
+      s.countryId,
+      prev + UNIVERSITY_SLOTS_PER_SCHOOL,
+    );
+  }
+
+  // Player's explicit admissions for this year
+  let playerAdmissionsSet: Set<number> | null = null;
+  if (playerCountryId != null) {
+    const decisions = await prisma.playerUniversityDecision.findMany({
+      where: {
+        worldId,
+        countryId: playerCountryId,
+        startYear: newYear,
+      },
+      select: { personId: true },
+    });
+
+    playerAdmissionsSet = new Set(decisions.map((d) => d.personId));
+  }
+
   const peopleFull = await prisma.person.findMany({
     where: { worldId },
     include: {
@@ -875,6 +947,9 @@ export async function tickYear(worldId: number) {
   const marriageTxs: any[] = [];
   const friendshipTxs: any[] = [];
   const officeTxs: any[] = [];
+
+  // Track how many university admissions we've used per country this tick
+  const universityAdmissionsUsedByCountry = new Map<number, number>();
 
   // ---------- MARRIAGE UPDATES ----------
   const endedMarriageIds = new Set<number>();
@@ -1089,7 +1164,7 @@ export async function tickYear(worldId: number) {
       (e) => e.school.level === 'University' && e.endYear !== null,
     );
 
-        // EDUCATION IMPACT MODELING v1:
+    // EDUCATION IMPACT MODELING v1:
     // If this person is currently enrolled, their school acts as a
     // development accelerator on top of BBGM-style yearly dev.
     if (currentEnrollment && currentEnrollment.school) {
@@ -1099,7 +1174,6 @@ export async function tickYear(worldId: number) {
         currentEnrollment.school.prestige,
       );
     }
-
 
     if (!upd.isAlive) {
       if (currentJob) {
@@ -1145,7 +1219,7 @@ export async function tickYear(worldId: number) {
         stillEnrolled = null;
       } else if (
         level === 'University' &&
-        ((newYear - currentEnrollment.startYear) >= 4 || age >= 23)
+        (newYear - currentEnrollment.startYear >= 4 || age >= 23)
       ) {
         eduTxs.push(
           prisma.enrollment.update({
@@ -1187,7 +1261,12 @@ export async function tickYear(worldId: number) {
             }),
           );
         }
-      } else if (age >= 12 && age <= 17 && hasCompletedPrimary && !hasCompletedSecondary) {
+      } else if (
+        age >= 12 &&
+        age <= 17 &&
+        hasCompletedPrimary &&
+        !hasCompletedSecondary
+      ) {
         const candidates = schoolsByCountryLevel.get(keySecondary);
         if (candidates && candidates.length > 0) {
           const school = pickRandom(candidates);
@@ -1209,9 +1288,33 @@ export async function tickYear(worldId: number) {
       ) {
         const candidates = schoolsByCountryLevel.get(keyUniversity);
         if (candidates && candidates.length > 0) {
-          const academic = (upd.intelligence + upd.discipline) / 2;
-          const uniChance = 0.25 + (academic - 20) * (0.4 / 60);
-          if (Math.random() < Math.max(0, Math.min(0.7, uniChance))) {
+          const isPlayerCountry =
+            playerCountryId != null && countryId === playerCountryId;
+
+          const cap = universitySlotsByCountry.get(countryId) ?? 0;
+          const used = universityAdmissionsUsedByCountry.get(countryId) ?? 0;
+          const remaining = cap > 0 ? Math.max(0, cap - used) : 0;
+
+          let shouldEnroll = false;
+
+          if (isPlayerCountry && playerAdmissionsSet) {
+            // Player-controlled: only age 18 and explicitly chosen
+            if (age === 18 && playerAdmissionsSet.has(person.id) && remaining > 0) {
+              shouldEnroll = true;
+            }
+          } else {
+            // NPC logic: same random chance, but respect the cap
+            if (remaining > 0) {
+              const academic = (upd.intelligence + upd.discipline) / 2;
+              const uniChance = 0.25 + (academic - 20) * (0.4 / 60);
+              const p = Math.max(0, Math.min(0.7, uniChance));
+              if (Math.random() < p) {
+                shouldEnroll = true;
+              }
+            }
+          }
+
+          if (shouldEnroll) {
             const school = pickRandom(candidates);
             eduTxs.push(
               prisma.enrollment.create({
@@ -1222,6 +1325,7 @@ export async function tickYear(worldId: number) {
                 },
               }),
             );
+            universityAdmissionsUsedByCountry.set(countryId, used + 1);
           }
         }
       }
@@ -1254,7 +1358,9 @@ export async function tickYear(worldId: number) {
       const promoFactor = (upd.discipline + upd.leadership) / 160;
       if (Math.random() < 0.05 * promoFactor) {
         const newTitle = nextJobTitle(job.title);
-        const newSalary = Math.round(job.salary * (1.1 + Math.random() * 0.05));
+        const newSalary = Math.round(
+          job.salary * (1.1 + Math.random() * 0.05),
+        );
 
         jobTxs.push(
           prisma.employment.update({
@@ -1275,7 +1381,9 @@ export async function tickYear(worldId: number) {
           }),
         );
       } else {
-        const newSalary = Math.round(job.salary * (1.02 + Math.random() * 0.02));
+        const newSalary = Math.round(
+          job.salary * (1.02 + Math.random() * 0.02),
+        );
         jobTxs.push(
           prisma.employment.update({
             where: { id: job.id },
@@ -1290,7 +1398,8 @@ export async function tickYear(worldId: number) {
     if (age < 18 || age > 65) continue;
 
     const countryCompanies =
-      (person.countryId && companiesByCountry.get(person.countryId)) || companies;
+      (person.countryId && companiesByCountry.get(person.countryId)) ||
+      companies;
     if (!countryCompanies || countryCompanies.length === 0) continue;
 
     const skill =
@@ -1389,6 +1498,17 @@ export async function tickYear(worldId: number) {
   // ---------- COUNTRY YEARLY PERFORMANCE ----------
   await computeCountryYearPerformance(worldId, newYear);
 
+  // ---------- CLEAN UP PLAYER ADMISSIONS FOR THIS YEAR ----------
+  if (playerCountryId != null) {
+    await prisma.playerUniversityDecision.deleteMany({
+      where: {
+        worldId,
+        countryId: playerCountryId,
+        startYear: newYear,
+      },
+    });
+  }
+
   // (optional) return a small summary to the caller
   return {
     newYear,
@@ -1396,6 +1516,7 @@ export async function tickYear(worldId: number) {
     births: births.length,
   };
 }
+
 
 // ============================================================================
 // COMPANY YEARLY PERFORMANCE (v1)

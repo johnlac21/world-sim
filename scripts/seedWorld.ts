@@ -208,6 +208,7 @@ async function main() {
   await prisma.country.deleteMany();
   await prisma.world.deleteMany();
   await prisma.industryRole.deleteMany();
+  await prisma.playerUniversityDecision.deleteMany();
 
   const world = await prisma.world.create({
     data: {

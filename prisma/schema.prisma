@@ -12,7 +12,6 @@ model World {
   name        String
   currentYear Int    @default(0)
 
-  // One-to-many: world → countries
   countries Country[] @relation("WorldCountries")
 
   people    Person[]
@@ -20,10 +19,12 @@ model World {
   schools   School[]
   offices   Office[]
 
-  companyPerformances  CompanyYearPerformance[]
-  countryPerformances  CountryYearPerformance[]
+  companyPerformances CompanyYearPerformance[]
+  countryPerformances CountryYearPerformance[]
 
-  // One-to-one: which country the user controls
+  // NEW: player university decisions for this world
+  playerUniversityDecisions PlayerUniversityDecision[]
+
   controlledCountryId Int?     @unique
   controlledCountry   Country? @relation("ControlledCountry", fields: [controlledCountryId], references: [id])
 
@@ -34,7 +35,6 @@ model Country {
   id   Int    @id @default(autoincrement())
   name String
 
-  // Back to world (regular one-to-many, MUST use same name)
   world   World @relation("WorldCountries", fields: [worldId], references: [id])
   worldId Int
 
@@ -47,6 +47,9 @@ model Country {
   controlledByWorld World? @relation("ControlledCountry")
 
   performances CountryYearPerformance[]
+
+  // NEW: player university decisions targeting this country
+  playerUniversityDecisions PlayerUniversityDecision[]
 }
 
 model Person {
@@ -112,7 +115,7 @@ model Person {
   // Personality system
   // =========================
   personalityArchetype String // e.g. "Visionary", "Leader"
-  personalitySubtype  String // e.g. "Dream Architect", "People's Champion"
+  personalitySubtype   String // e.g. "Dream Architect", "People's Champion"
 
   isAlive  Boolean @default(true)
   isPlayer Boolean @default(false)
@@ -144,6 +147,8 @@ model Person {
   // ==== OPTION D: politics / prestige ====
   terms    Term[] // offices held over time
   prestige Int    @default(0)
+
+  playerUniversityDecisions PlayerUniversityDecision[]
 
   createdAt DateTime @default(now())
 }
@@ -195,7 +200,7 @@ model School {
   id       Int    @id @default(autoincrement())
   name     String
   level    String // "Primary" | "Secondary" | "University"
-  prestige Int    // 1–100
+  prestige Int // 1–100
 
   world   World @relation(fields: [worldId], references: [id])
   worldId Int
@@ -259,8 +264,8 @@ model Office {
   id         Int    @id @default(autoincrement())
   name       String // e.g. "World President", "President of Alboria"
   level      String // "World" | "Country"
-  termLength Int    // in years
-  prestige   Int    // 1–100, boosts winner prestige
+  termLength Int // in years
+  prestige   Int // 1–100, boosts winner prestige
 
   world   World @relation(fields: [worldId], references: [id])
   worldId Int
@@ -301,7 +306,7 @@ model IndustryRole {
   id       Int    @id @default(autoincrement())
   industry String // e.g. "TECH", "FINANCE", "RESEARCH"
   name     String // e.g. "President", "Vice President"
-  rank     Int    // 0 = top of hierarchy, larger = lower tiers
+  rank     Int // 0 = top of hierarchy, larger = lower tiers
 
   positions CompanyPosition[]
 
@@ -333,7 +338,7 @@ model CompanyPosition {
 model CompanyYearPerformance {
   id Int @id @default(autoincrement())
 
-  world   World   @relation(fields: [worldId], references: [id])
+  world   World @relation(fields: [worldId], references: [id])
   worldId Int
 
   company   Company @relation(fields: [companyId], references: [id])
@@ -354,9 +359,9 @@ model CompanyYearPerformance {
 }
 
 model CountryYearPerformance {
-  id        Int  @id @default(autoincrement())
+  id Int @id @default(autoincrement())
 
-  world   World   @relation(fields: [worldId], references: [id])
+  world   World @relation(fields: [worldId], references: [id])
   worldId Int
 
   country   Country @relation(fields: [countryId], references: [id])
@@ -376,4 +381,24 @@ model CountryYearPerformance {
 
   @@unique([worldId, countryId, year])
   @@index([worldId, year])
+}
+
+model PlayerUniversityDecision {
+  id Int @id @default(autoincrement())
+
+  world   World @relation(fields: [worldId], references: [id])
+  worldId Int
+
+  country   Country @relation(fields: [countryId], references: [id])
+  countryId Int
+
+  person   Person @relation(fields: [personId], references: [id])
+  personId Int
+
+  // Year this person is scheduled to start university
+  startYear Int
+
+  createdAt DateTime @default(now())
+
+  @@unique([worldId, countryId, personId, startYear])
 }
