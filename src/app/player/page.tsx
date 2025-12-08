@@ -185,7 +185,20 @@ export default function PlayerCountryPage() {
       <header className="space-y-1">
         <h1 className="text-2xl font-bold">{data.name}</h1>
         <p className="text-sm text-gray-600">World: {data.worldName}</p>
+
+        <nav className="mt-2 flex items-center gap-3 text-sm">
+          <span className="px-2 py-1 rounded bg-blue-600 text-white">
+            Overview
+          </span>
+          <Link
+            href="/player/youth"
+            className="px-2 py-1 rounded border border-gray-300 bg-gray-50 hover:bg-gray-100"
+          >
+            Youth Pipeline
+          </Link>
+        </nav>
       </header>
+
 
       {/* Basic overview */}
       <section>
