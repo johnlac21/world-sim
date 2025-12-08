@@ -114,6 +114,80 @@ function computeBaseSalary(person: {
   return Math.round(25000 + (skill - 20) * (125000 / 60));
 }
 
+// --- Education impact modeling v1 ---
+// Groupings for education-driven stat buffs
+const EDU_COGNITIVE_KEYS: (keyof PersonStats)[] = [
+  'intelligence',
+  'memory',
+  'creativity',
+  'judgment',
+  'adaptability',
+];
+
+const EDU_SOCIAL_KEYS: (keyof PersonStats)[] = [
+  'charisma',
+  'leadership',
+  'empathy',
+  'communication',
+  'confidence',
+  'negotiation',
+];
+
+const EDU_DISCIPLINE_KEYS: (keyof PersonStats)[] = [
+  'discipline',
+  'patience',
+];
+
+/**
+ * Apply an education-based buff for the current year to a person's stats.
+ * This runs *after* BBGM-style development, so school acts as a development accelerator.
+ *
+ * - Primary: cognitive + discipline (small boost)
+ * - Secondary: cognitive + discipline (moderate boost)
+ * - University: cognitive + social (bigger boost)
+ *
+ * All scaled by school prestige (0–100).
+ */
+function applyEducationBuffForYear(
+  statsTarget: { [K in keyof PersonStats]: number },
+  schoolLevel: string,
+  schoolPrestige: number | null,
+) {
+  const prestige = clampPrestige(schoolPrestige ?? 0);
+  if (prestige <= 0) return;
+
+  const prestigeFactor = prestige / 100; // 0.0–1.0
+
+  let buffKeys: (keyof PersonStats)[] = [];
+  let basePerStat = 0;
+
+  if (schoolLevel === 'Primary') {
+    // Foundational skills: cognitive + discipline, smaller per-year effect.
+    buffKeys = [...EDU_COGNITIVE_KEYS, ...EDU_DISCIPLINE_KEYS];
+    basePerStat = 0.35; // at prestige 100 → +0.35 per stat per year
+  } else if (schoolLevel === 'Secondary') {
+    // Teen academic formation: stronger cognitive/discipline push.
+    buffKeys = [...EDU_COGNITIVE_KEYS, ...EDU_DISCIPLINE_KEYS];
+    basePerStat = 0.5;
+  } else if (schoolLevel === 'University') {
+    // University as accelerator: cognitive + social.
+    buffKeys = [...EDU_COGNITIVE_KEYS, ...EDU_SOCIAL_KEYS];
+    basePerStat = 0.7;
+  } else {
+    // Unknown level, skip
+    return;
+  }
+
+  const perStatDelta = basePerStat * prestigeFactor;
+
+  for (const key of buffKeys) {
+    const current = statsTarget[key];
+    const next = clampStat(current + perStatDelta);
+    statsTarget[key] = next;
+  }
+}
+
+
 /**
  * Apply one year of BBGM-style development to a person's stats.
  * Uses potentialOverall, peakAge, developmentStyle, and per-stat peak tweaks.
@@ -1014,6 +1088,18 @@ export async function tickYear(worldId: number) {
     const hasCompletedUniversity = person.enrollments.some(
       (e) => e.school.level === 'University' && e.endYear !== null,
     );
+
+        // EDUCATION IMPACT MODELING v1:
+    // If this person is currently enrolled, their school acts as a
+    // development accelerator on top of BBGM-style yearly dev.
+    if (currentEnrollment && currentEnrollment.school) {
+      applyEducationBuffForYear(
+        upd as any, // upd holds the already-developed stats for this year
+        currentEnrollment.school.level,
+        currentEnrollment.school.prestige,
+      );
+    }
+
 
     if (!upd.isAlive) {
       if (currentJob) {
