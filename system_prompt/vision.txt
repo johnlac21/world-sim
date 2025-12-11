@@ -1,0 +1,820 @@
+WORLD SIM BBGM — PROOF OF CONCEPT (GAME DESIGN OVERVIEW)
+
+VERSION: 0.1 (HIGH-LEVEL DESIGN DOCUMENT / PROOF OF CONCEPT)
+GOAL: Capture the core vision, gameplay loop, and simulation structure of a BBGM-style life-and-society management game.
+
+========================================================
+
+HIGH-LEVEL PITCH
+========================================================
+
+World Sim BBGM is a browser-based management sim that takes the design philosophy of Basketball GM (BBGM) and applies it to a living world of people, industries, and governments.
+
+Instead of managing a sports team, the player manages a country’s “roster” of people across:
+
+A small set of global INDUSTRIES with fixed hierarchies (President, VP, senior roles).
+
+A GOVERNMENT hierarchy that acts as the highest-stakes competitive layer.
+
+A POPULATION pipeline where youth develop into adults, enter careers, move between countries, and form families.
+
+The game emphasizes:
+
+Deterministic stats: a person’s ratings visibly determine their performance.
+
+Clear hierarchies: every important role lives in a tree the player can understand.
+
+Development curves: people get better, peak, and decline over time.
+
+Annual competition: each year, countries are ranked on industry output, government performance, and population well-being, producing “championships” and dynasties.
+
+Core fantasy:
+“You are the architect of a country’s elite talent and institutions across decades, watching industries, governments, and generations rise and fall under your management.”
+
+========================================================
+2. DESIGN PHILOSOPHY
+
+2.1 BBGM-AS-FOUNDATION
+The game deliberately mirrors BBGM’s core ideas:
+
+Manage people, not abstract policies.
+
+Use clear rating systems and development arcs.
+
+Provide deterministic, interpretable stats.
+
+Structure time around a repeating competitive loop (seasons/years).
+
+Track history: awards, championships, dynasties, Hall of Fame.
+
+2.2 NOT A PURE GOVERNMENT SIM
+This is not a “tax rate and policy slider” government simulator. The focus is on:
+
+People in roles.
+
+Performance in structured hierarchies.
+
+Talent pipelines and rosters.
+
+Organizational output, not low-level legislative detail.
+
+2.3 NOT A PURE LIFE SIM
+Individual day-to-day life is abstracted. The focus is:
+
+Careers, performance, influence, and legacy.
+
+Families and reproduction as part of the talent pipeline.
+
+Personality and stats driving aggregate behavior, not micro-RPG choices.
+
+2.4 SYSTEMS-FIRST, BUT GAME-DRIVEN
+The simulation is rich enough to be interesting on its own, but always serves gameplay:
+
+Stats always have visible effects.
+
+Roles always matter.
+
+Each year generates meaningful “content” for the player: promotions, declines, breakthroughs, rankings, awards.
+
+========================================================
+3. CORE ENTITIES AND HIERARCHIES
+
+3.1 COUNTRIES
+
+The world contains N countries (e.g., 5–10).
+
+Each country has:
+
+A population (adults + youth).
+
+Access to the same set of global industries.
+
+Its own government hierarchy.
+
+Its own score each year (like a team record).
+
+3.2 INDUSTRIES
+
+There is a small number of global industries (e.g., 3):
+Example: Technology, Finance, Research (or similar thematic categories).
+
+Each industry exists in every country and has a fixed hierarchy of roles, such as:
+
+Industry President (top role per country per industry).
+
+Vice President.
+
+Senior Directors / Managers.
+
+A fixed number of subordinate roles (e.g., ~10).
+
+Top roles (President, VP, certain senior positions) have multi-year contracts.
+
+Lower roles can be reassigned at any time.
+
+3.3 GOVERNMENT
+
+Each country has a government hierarchy, which is the “premier league” of the game.
+
+Positions might include:
+
+President / Prime Minister (head of state/government).
+
+Key ministers (Economy, Education, Industry, etc.).
+
+A small supporting cast of high-level officials.
+
+Government roles are more demanding and use more well-rounded stat requirements than industry roles.
+
+The government’s effectiveness strongly influences a country’s yearly score.
+
+3.4 POPULATION
+
+Every person in the world has:
+
+Core stats (cognitive, social, etc.).
+
+A potential and development style.
+
+A set of personality traits.
+
+A current age and life stage.
+
+A current role:
+
+In an industry hierarchy.
+
+In government.
+
+In a generic non-interactive job.
+
+Unemployed or retired.
+
+People are associated with:
+
+A country.
+
+Optional family/parents.
+
+A career history.
+
+A marriage/family history.
+
+3.5 CAREER PIPELINES
+
+Youth appear around age 15–16 in a “youth” pool (like prospects).
+
+At age 18, they enter the “valid adult” pool and become eligible for:
+
+University education (if selected / qualified).
+
+Entry-level roles in industries.
+
+Low-level government or generic roles.
+
+High-potential youth can be steered (via education and role assignments) into high-level careers.
+
+3.6 INTERNATIONAL MOVEMENT
+
+People can move between countries:
+
+For better salaries.
+
+For more prestigious industries.
+
+For better government roles.
+
+This functions like free agency rather than trading:
+
+No rigid trade mechanic.
+
+Movement driven by stats, salary, prestige, and personality.
+
+========================================================
+4. STATS AND DETERMINISTIC PERFORMANCE
+
+4.1 STAT CATEGORIES
+Each person has a set of ratings similar to sports sims but applied to life and industry:
+
+Cognitive stats (e.g., intelligence, judgment, creativity, discipline).
+
+Social/leadership stats (e.g., charisma, leadership, communication, negotiation).
+
+Reliability and integrity stats (e.g., discipline, integrity, stability).
+
+Possibly some domain-specific modifiers (e.g., technical aptitude for Tech industry).
+
+4.2 DEVELOPMENT CURVES
+
+Starting from age 18:
+
+Rapid improvement from ~18–30.
+
+Plateau through early-mid 30s.
+
+Gradual decline from mid-30s onward.
+
+Steeper decline after 40–45, especially in certain stats.
+
+Each person has:
+
+A potential rating that defines their ceiling.
+
+A development style (early/normal/late bloomer) that shifts peak age and growth shape.
+
+Variation between stat categories (e.g., social vs cognitive vs reliability).
+
+4.3 DETERMINISTIC OUTPUT
+Stats must produce visible, interpretable outcomes:
+
+Industry output:
+
+Employee productivity is a deterministic function of relevant stats.
+
+Aggregate company/industry performance is derived from employee performance.
+
+Government output:
+
+Policy success and stability are influenced by leaders’ stats.
+
+High-judgment, high-integrity leaders yield better outcomes.
+
+Career progress:
+
+Promotions and role suitability scores come from stats.
+
+National performance:
+
+A country’s yearly score is derived from industry output, government effectiveness, and population well-being, all stat-driven.
+
+The key idea: a person with a high “Industry Talent” rating in Tech will consistently be more productive and impactful than a low-rated person, just like a high 3PT rating leads to better shooting stats in BBGM.
+
+========================================================
+5. TIME MODEL AND SIMULATION CADENCE
+
+5.1 DAILY TICKS (MICRO LEVEL)
+On a day-to-day basis (internally):
+
+Employees perform work:
+
+Their productivity contributes to company/industry performance.
+
+Government operates:
+
+Minor shifts in approval, stability, and policy effectiveness occur.
+
+Health and aging:
+
+Time passes and minor age-related risk accumulates.
+
+Social interactions happen in aggregate:
+
+Relationship scores nudge up or down based on personality/stats, but this is abstracted.
+
+The player does not necessarily inspect each day individually; daily ticks are mostly for internal consistency and fine-grained change.
+
+5.2 WEEKLY / MONTHLY SUMMARIES (PLAYER-FACING “BOX SCORES”)
+Every week or month, the game can generate reports:
+
+Top performers in each industry.
+
+Underperformers and declining figures.
+
+Changes in industry output.
+
+Movement in approval and stability.
+
+Standout youth performances in university.
+
+Notable events: promotions, firings, scandals, breakthroughs.
+
+These reports are the analog of “box scores” and weekly recaps in BBGM.
+
+5.3 YEARLY CYCLE (THE “SEASON”)
+The primary loop is yearly, just like a sports season:
+
+Each year:
+
+People age by 1.
+
+Youth graduate into adulthood.
+
+Retirements and deaths are processed.
+
+Major promotions and leadership changes are considered.
+
+International movement happens.
+
+A world ranking is computed.
+
+At the end of each year:
+
+Awards are given.
+
+A “champion” country is crowned.
+
+Historical records are updated.
+
+Each year is the main “season” step, equivalent to BBGM’s season cycle.
+
+========================================================
+6. INDUSTRIES AS BBGM-STYLE ORGANIZATIONS
+
+6.1 STRUCTURE
+
+Each industry has the same role structure in every country, e.g.:
+
+President (1)
+
+Vice President (1)
+
+Senior Director (2–4)
+
+Manager (3–6)
+
+Specialist / Staff (fixed number, e.g., 10)
+
+Total number of important roles per industry per country is small (e.g., 15–20), making it easy to browse and reason about.
+
+6.2 ASSIGNMENT AND CONTRACTS
+
+High-level roles (President, VP, Senior Director):
+
+Assigned via multi-year contracts (e.g., 3–5 years).
+
+Contract details include:
+
+Duration.
+
+Salary.
+
+Possibly a role prestige indicator.
+
+Lower roles (Manager, Specialist):
+
+Assigned more freely.
+
+Can be replaced without large penalties.
+
+6.3 PERFORMANCE STATS
+Workers generate industry-specific performance stats, for example:
+
+Base productivity index.
+
+Advanced metrics:
+
+Value Generated Above Replacement (VgAR).
+
+Contribution to innovation.
+
+Team leadership/cohesion impact.
+
+These stats update on a frequent cadence (weekly/monthly) and are visible in tables and leaderboards.
+
+6.4 INDUSTRY IMPACT ON COUNTRY
+Each industry contributes to the country’s overall yearly performance by:
+
+Providing productivity and innovation scores.
+
+Affecting employment and income.
+
+Influencing national prestige and attractiveness to migrants.
+
+The player optimizes the assignment of talent into industry hierarchies to maximize output and competitive standing.
+
+========================================================
+7. GOVERNMENT AS THE PREMIER COMPETITIVE LAYER
+
+7.1 HIERARCHY
+Government is treated as the highest-level league:
+
+President / Prime Minister.
+
+Key ministers (e.g., Economy, Education, Industry, Interior).
+
+A handful of high-level officials.
+
+These roles are fewer but more impactful than industry roles.
+
+7.2 DEMANDS AND STAT REQUIREMENTS
+
+Government roles require a broader mix of stats:
+
+Leadership, integrity, judgment, charisma, communication, stability.
+
+Poorly suited leaders:
+
+Lower stability.
+
+Worse policy outcomes.
+
+Higher risk of scandals or crises.
+
+Strong leaders:
+
+Raise the country’s effectiveness and score.
+
+7.3 COMPETITIVE METRICS
+Government performance is measured via:
+
+Stability/approval.
+
+Effective implementation of broad initiatives.
+
+Crisis avoidance or management.
+
+Long-term national well-being indicators.
+
+This performance directly influences the yearly ranking and “championship” outcome.
+
+7.4 ELECTIONS AND TERMS (LATER-STAGE FEATURE)
+Initially, government roles may be appointed. In more advanced versions:
+
+Elections can be simulated.
+
+Voters respond to candidates’ stats, performance, and personality.
+
+Term limits enforce leadership rotation.
+
+Election cycles add drama and strategic planning.
+
+========================================================
+8. POPULATION, FAMILY, AND CAREER PIPELINES
+
+8.1 INITIAL POPULATION
+At world creation:
+
+Each country starts with:
+
+A small adult population (e.g., 100–200 valid adults aged 18–50).
+
+A background youth population (children) that will surface as teenagers.
+
+Adults are seeded with:
+
+Stats, personality, and potential.
+
+Basic career history (some generic jobs, some already in industries/government).
+
+8.2 YOUTH EMERGENCE
+
+Youth appear in a “Youth” view/tab around age 15–16.
+
+At 18:
+
+They join the adult pool.
+
+They can attend university (if selected or if they qualify).
+
+They can enter early career roles.
+
+8.3 EDUCATION PATHWAY
+
+Promising youth may attend university:
+
+University acts like a high-level “development accelerator.”
+
+Graduates are more competitive for industry and government roles.
+
+Education accelerates:
+
+Cognitive and domain-related stats.
+
+Career outcomes.
+
+8.4 MARRIAGE AND REPRODUCTION
+
+Adults have personality-driven probabilities of:
+
+Entering relationships.
+
+Marrying.
+
+Having children.
+
+The player may optionally:
+
+Match couples manually within certain limits (e.g., for roleplay or dynastic goals).
+
+Children:
+
+Inherit a mixture of parents’ stats and environment (income, roles).
+
+Enter the youth pipeline later.
+
+8.5 RETIREMENT, GENERIC JOBS, AND UNEMPLOYMENT
+
+Not everyone is in industries or government.
+
+Some adults:
+
+Occupy generic jobs (abstracted, non-interactive).
+
+Are unemployed (with a risk of dropping out of the competitive pool).
+
+Retire fully in old age.
+
+The simulation represents the broader population without requiring micromanagement of every person.
+
+8.6 INTERNATIONAL MOVEMENT
+
+People can move between countries if:
+
+They are attracted by higher salaries.
+
+They seek more prestigious industries or governments.
+
+Their personality (ambition, risk-taking) pushes them to move.
+
+This creates:
+
+Talent flows.
+
+“Brain drain” and “talent import” dynamics.
+
+The player can leverage these flows by:
+
+Offering better roles.
+
+Building a more prestigious country.
+
+========================================================
+9. YEARLY COMPETITION AND SCORING
+
+9.1 YEARLY EVALUATION
+At the end of each year, the game computes a score for each country based on:
+
+Industry output:
+
+Aggregated productivity and innovation across all industries.
+
+Government effectiveness:
+
+Stability and quality of decisions.
+
+Population well-being:
+
+Abstracted metrics like prosperity, education level, and talent density.
+
+9.2 WORLD RANKING AND “CHAMPION”
+Countries are ranked by total score:
+
+#1 is declared the “World Champion” for that year.
+
+The ranking table is displayed similarly to league standings in BBGM.
+
+9.3 IMPACT OF PERFORMANCE
+
+High-performing countries:
+
+Gain prestige.
+
+Attract more talent.
+
+Have an easier time retaining high performers.
+
+Low-performing countries:
+
+Lose prestige.
+
+Suffer talent exit.
+
+May experience more instability.
+
+This feedback loop reinforces the importance of good talent allocation and leadership.
+
+9.4 MULTI-YEAR DYNASTIES
+Over time:
+
+Some countries may dominate for years, forming dynasties.
+
+Others may rise from weak to strong through player skill and luck.
+
+Historical records capture these arcs.
+
+========================================================
+10. AWARDS, HISTORY, AND LEGACY
+
+10.1 INDIVIDUAL AWARDS
+Each year, the game grants awards such as:
+
+All-Industry Teams (e.g., “Tech First Team,” “Finance First Team”).
+
+All-Government Team.
+
+Industry MVP (most productive or impactful individual).
+
+Government MVP (most impactful political figure).
+
+Rising Star awards (top young talents).
+
+Executive/President of the Year.
+
+These are based on the deterministic stats and performance metrics produced in that year.
+
+10.2 COUNTRY-LEVEL HISTORY
+
+Country History page includes:
+
+List of yearly rankings and championship wins.
+
+Past presidents/government leaders.
+
+Past industry presidents and notable executives.
+
+Notable emergent dynasties (families with repeated impact).
+
+Major events (e.g., “Golden Decade of Tech,” crisis years).
+
+10.3 HALL OF FAME AND LEGACY
+
+Exceptional individuals are inducted into a Hall of Fame if they:
+
+Attain multiple awards.
+
+Drive a long period of dominance.
+
+Have exceptional career values above replacement.
+
+Hall of Fame entries show:
+
+Career timeline.
+
+Award history.
+
+Key stats and contributions.
+
+This provides long-term goals and emotional attachment.
+
+10.4 REPLAYABILITY THROUGH HISTORY
+
+Each save/world accumulates a rich legacy.
+
+Players can:
+
+Restart with new seeds.
+
+Compare dynasties between saves.
+
+Try to build different kinds of dominant countries (industry-heavy, government-heavy, talent-factory, etc.).
+
+========================================================
+11. PLAYER ROLE AND CORE GAMEPLAY LOOP
+
+11.1 WHAT THE PLAYER ACTUALLY DOES
+The player controls exactly one country. Their core actions are:
+
+Inspect:
+
+Browse industries, government, and population.
+
+Analyze individual stats, potential, and performance.
+
+Assign:
+
+Appoint people to industry and government roles.
+
+Promote/demote within hierarchies.
+
+Develop:
+
+Choose which youth get university access.
+
+Nudge the talent pipeline toward key roles.
+
+Compete:
+
+Sim through days/weeks/months.
+
+Reach the year-end.
+
+See rankings, awards, and history updates.
+
+Optimize:
+
+Balance roles, contracts, and development to maximize yearly score.
+
+Build multi-year strategies to create dynasties.
+
+11.2 CORE LOOP SUMMARY
+A typical loop looks like:
+
+View the current year’s situation:
+
+Who is in key roles?
+
+Who is underperforming?
+
+Which youth are emerging?
+
+Make decisions:
+
+Assign/promote/demote leaders in industries and government.
+
+Enroll promising youth in university.
+
+Bring in or retain top talent from global free agency.
+
+Sim time:
+
+Run daily/weekly ticks in chunks.
+
+Reach the year-end.
+
+Review outcomes:
+
+Individual and organizational performance stats.
+
+Awards and leaderboards.
+
+Country ranking and championship.
+
+Emerging stars and falling legends.
+
+Adjust:
+
+Fix weak spots.
+
+Double down on strengths.
+
+Plan for aging stars and incoming youth.
+
+Repeat for decades.
+
+11.3 LONG-TERM GOALS
+
+Build a country that:
+
+Wins multiple championships.
+
+Produces iconic Hall of Fame leaders.
+
+Establishes legendary industry or government dynasties.
+
+Explore how different strategies perform:
+
+Government-heavy vs industry-heavy focus.
+
+Tech-focused vs finance-focused dominance.
+
+“Homegrown talent” vs importing foreign elites.
+
+========================================================
+12. SCOPE AND MVP
+
+For a minimum viable product (MVP), the core pieces are:
+
+Countries (e.g., 5).
+
+3 industries with fixed hierarchies per country.
+
+Government hierarchy per country.
+
+Initial adult population and youth pipeline.
+
+Deterministic stats and development curves.
+
+Simplified daily/weekly simulation:
+
+Industry and government performance.
+
+Basic employment and movement.
+
+Aging, births, deaths.
+
+Yearly competition and ranking:
+
+Simple composite score.
+
+Champion label per year.
+
+Basic awards:
+
+Top industry performers.
+
+Government MVP.
+
+Country of the Year.
+
+History tracking:
+
+Yearly rankings.
+
+Basic award logs.
+
+Future expansions can deepen:
+
+Education systems.
+
+Election mechanics.
+
+More detailed migration and crisis modeling.
+
+Advanced event systems.
+
+More nuanced personality and relationship modeling.
+
+But the core BBGM-style experience—managing roles, stats, performance, and championships over time—must work first.
+
+========================================================
+END OF DOCUMENT
