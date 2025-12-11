@@ -868,3 +868,30 @@ This page is now the main “team dashboard” equivalent for the controlled cou
   - Global Leaders and Office pages now show cleaner summaries and link through to office history and individual person profiles.
   - Company hierarchy sidebar component that shows the full ladder from President down to Worker, including key stats for each person.
 - Talent Search modal for scouting people across the world by age, stats, employment status, and industry experience, with pagination and optional “Select” callbacks for future assignment flows.
+
+Company Page UI v2 (Ticket 25)
+
+The /company/[id] page has been rebuilt into a BBGM-style two-column layout. The main column focuses on performance (current-year panel, benchmark, peers, and a mini history chart), while the sidebar becomes a sticky “depth chart” editor for the company hierarchy.
+Key improvements include:
+- Current-year performance panel with talent/leadership/reliability breakdown on top of outputScore.
+- Industry benchmark and peers table driven by CompanyYearPerformance, highlighting the current company.
+- Compact performance history bar chart across recent seasons.
+- A company hierarchy sidebar using DepthChartRow, with edit mode, lock icons, and integrated TalentSearchModal for controlled-country companies.
+
+Standings Page UI v2 (Ticket 26)
+
+The /world/[id]/standings page has been upgraded to a wide, BBGM-style league table. Countries are now clearly ranked by CountryYearPerformance, with movement vs. last year surfaced via compact trend icons and recent-season history.
+Key improvements include:
+- Redesigned league table with dense, readable columns for rank, country, totalScore, last year rank, trend, and recent seasons.
+- Trend arrows (+1 / –1 / same / new) derived from multi-year CountryYearPerformance.
+- Visual highlighting of the player-controlled country’s row.
+- Integrated Top Companies section on the same page so users can see how elite companies relate to the current standings.
+
+Person Page UI v2 (Ticket 27)
+
+The /person/[id] page now behaves like a BBGM “player card” for people in the world. A two-column layout separates core stats and performance from quick facts and career history, tying in the new PersonYearPerformance data.
+Key improvements include:
+- A 24-attribute grid grouped into Cognitive, Social/Influence, Physical, and Personality categories using StatPill.
+- A PersonYearPerformance mini bar chart showing contributionScore by year, plus peak season and industry summary.
+- Structured employment and education history tables with current and past entries clearly separated.
+- New role and office history sections (company hierarchy roles and political terms), alongside a cleaned-up relationships panel.

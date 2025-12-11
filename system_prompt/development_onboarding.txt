@@ -2597,3 +2597,30 @@ Updated GovernmentCard list rendering to use unique keys.
 - When extending the UI:
   - Prefer adding new views as client components that follow this fetch pattern and use the existing layout primitives (sidebar nav, headers, cards, tables).
   - Reuse `TalentSearchModal` and `CompanyHierarchySidebar` instead of rebuilding ad-hoc talent/hierarchy UIs; if the API shape changes, update these components in one place.
+
+Company Page UI v2 (Ticket 25)
+
+Rebuilt src/app/company/[id]/page.tsx into a two-column BBGM-style layout: main content on the left and a sticky hierarchy sidebar on the right.
+Integrated SectionHeader, Panel/PanelBody/PanelHeader, Table, and DepthChartRow to standardize the company UI with the new shared components.
+Extended /api/company/[id]/hierarchy (app router route) to return company, hierarchy, latestPerformance, performanceHistory, industryBenchmark, industryPeers, and isEditable.
+Hooked up edit mode for the hierarchy sidebar: candidate loading via /api/player/companies/[companyId]/positions/[roleId]/candidates and assignment via /api/player/companies/[companyId]/positions/[roleId]/assign, including support for the CompanyPosition.locked flag.
+Gated manual editing by world.controlledCountryId so only the controlled country’s companies expose lock toggles and assignment dropdowns.
+
+Standings Page UI v2 (Ticket 26)
+
+Reworked src/app/world/[id]/standings/page.tsx into a wide league table layout that mirrors BBGM’s standings page.
+Added a TrendIcon component inside the page to visualize movement (“up”, “down”, “same”, “new”) based on current vs. last year rank.
+Updated /api/world/[id]/standings to use the Next.js App Router params signature (params as a Promise), aggregate 5-year CountryYearPerformance windows, compute ranks per year, and attach a history array to each country.
+Sorted standings by currentRank and highlighted the player-controlled country row using world.controlledCountryId.
+Kept the Top Companies section on the same page via /api/world/[id]/top-companies so standings and elite companies are visible together.
+
+Person Page UI v2 (Ticket 27)
+
+Replaced src/app/person/[id]/page.tsx with a two-column “player card” layout: left column for attributes and performance, right column for quick facts and career history.
+Extended /api/person/[id] to include:
+- performances (PersonYearPerformance with company),
+- companyPositions (with role + company), and
+- terms (with office + office.country),
+and to materialize personYearPerformanceHistory, roleHistory, and officeHistory arrays for the client.
+Left column: grouped 24-stat attribute grid using STAT_LAYOUT + StatPill, plus a PersonYearPerformance bar chart and derived summary (seasons logged, peak contribution, industries played in).
+Right column: Quick Facts card, normalized employment and education tables (current + past), a role history table (company hierarchy roles), an office history table (political terms), and a cleaned-up relationships panel.

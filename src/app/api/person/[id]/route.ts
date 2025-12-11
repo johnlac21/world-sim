@@ -1,5 +1,5 @@
-import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
 
 export async function GET(
   _req: Request,
@@ -9,7 +9,10 @@ export async function GET(
   const personId = Number(id);
 
   if (Number.isNaN(personId)) {
-    return NextResponse.json({ error: 'Invalid person id' }, { status: 400 });
+    return NextResponse.json(
+      { error: "Invalid person id" },
+      { status: 400 },
+    );
   }
 
   const person = await prisma.person.findUnique({
@@ -18,12 +21,12 @@ export async function GET(
       world: true,
       country: true,
       employments: {
-        orderBy: { startYear: 'asc' },
-        include: { company: true }, // ⬅ include company so we can show name + link
+        orderBy: { startYear: "asc" },
+        include: { company: true },
       },
       enrollments: {
         include: { school: true },
-        orderBy: { startYear: 'asc' },
+        orderBy: { startYear: "asc" },
       },
       marriagesA: {
         include: { personB: true },
@@ -31,11 +34,40 @@ export async function GET(
       marriagesB: {
         include: { personA: true },
       },
+      // NEW: hierarchy roles for role history
+      companyPositions: {
+        include: {
+          company: true,
+          role: true,
+        },
+        orderBy: { startYear: "asc" },
+      },
+      // NEW: political terms / offices
+      terms: {
+        include: {
+          office: {
+            include: {
+              country: true,
+            },
+          },
+        },
+        orderBy: { startYear: "asc" },
+      },
+      // NEW: per-person yearly performance rows
+      performances: {
+        include: {
+          company: true,
+        },
+        orderBy: { year: "asc" },
+      },
     },
   });
 
   if (!person) {
-    return NextResponse.json({ error: 'Person not found' }, { status: 404 });
+    return NextResponse.json(
+      { error: "Person not found" },
+      { status: 404 },
+    );
   }
 
   const spouses = [
@@ -61,7 +93,51 @@ export async function GET(
 
   const currentEnrollment =
     person.enrollments.find((e) => e.endYear === null) ?? null;
-  const pastEnrollments = person.enrollments.filter((e) => e.endYear !== null);
+  const pastEnrollments = person.enrollments.filter(
+    (e) => e.endYear !== null,
+  );
+
+  // NEW: PersonYearPerformance history
+  const personYearPerformanceHistory = person.performances
+    .slice()
+    .sort((a, b) => a.year - b.year)
+    .map((p) => ({
+      year: p.year,
+      companyId: p.companyId,
+      companyName: p.company.name,
+      industry: p.industry,
+      talentScore: p.talentScore,
+      leadershipScore: p.leadershipScore,
+      reliabilityScore: p.reliabilityScore,
+      contributionScore: p.contributionScore,
+    }));
+
+  // NEW: Role history (company hierarchy)
+  const roleHistory = person.companyPositions
+    .slice()
+    .sort((a, b) => a.startYear - b.startYear)
+    .map((pos) => ({
+      id: pos.id,
+      companyId: pos.companyId,
+      companyName: pos.company.name,
+      roleName: pos.role.name,
+      industry: pos.company.industry,
+      startYear: pos.startYear,
+      endYear: pos.endYear,
+    }));
+
+  // NEW: Office history (terms of office)
+  const officeHistory = person.terms
+    .slice()
+    .sort((a, b) => a.startYear - b.startYear)
+    .map((t) => ({
+      id: t.id,
+      officeName: t.office.name,
+      level: t.office.level,
+      countryName: t.office.country?.name ?? null,
+      startYear: t.startYear,
+      endYear: t.endYear,
+    }));
 
   const payload = {
     id: person.id,
@@ -143,12 +219,16 @@ export async function GET(
     pastEnrollments: pastEnrollments.map((e) => ({
       id: e.id,
       schoolName: e.school.name,
-      level: e.school.level,
+      level: e.level,
       startYear: e.startYear,
       endYear: e.endYear,
     })),
 
     spouses,
+
+    personYearPerformanceHistory,
+    roleHistory,
+    officeHistory,
   };
 
   return NextResponse.json(payload);
