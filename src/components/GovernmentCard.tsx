@@ -44,8 +44,8 @@ export function GovernmentCard({ offices }: Props) {
               </tr>
             </thead>
             <tbody>
-              {offices.map((o) => (
-                <tr key={o.officeId} className="border-b last:border-0">
+              {offices.map((o, idx) => (
+                <tr key={`${o.officeId}-${idx}`} className="border-b last:border-0">
                   <td className="py-1 pr-4">
                     <Link
                       href={`/office/${o.officeId}`}
