@@ -827,3 +827,44 @@ Recent Additions:
 
 - Introduced PersonYearPerformance, a per-person yearly contribution model populated during each simulation tick. For every occupied CompanyPosition, the sim now stores talentScore, leadershipScore, reliabilityScore, industry, and a combined contributionScore. This enables future leaderboards, awards, and career pages without recomputing stats on the fly.
 
+UI Layout Shell (Ticket 24)
+
+A full BBGM-style global UI shell is now implemented across the entire app.
+This includes:
+
+A persistent top navigation bar (world name, year, Sim 1 Year, Reset World, My Country, search).
+
+A left sidebar navigation with WORLD, COUNTRY, PEOPLE, and COMPANIES sections.
+
+A centralized page wrapper with BBGM-style dense, data-first layout.
+
+Integration through a new GameLayout component, now wrapping all pages via RootLayout.
+
+Updated globals.css to follow the UI Vision palette (#f2f2f2 background, compact spacing).
+
+This establishes a consistent UI frame for all future page upgrades.
+
+
+Player Dashboard UI v2 (Ticket 24)
+
+The /player page now uses the three-column BBGM dashboard layout defined in the UI Vision document.
+New features include:
+
+Left column: Mini-standings widget + Your Standing summary.
+
+Center column: Country Overview panels, yearly performance breakdown, and a Youth Pipeline quick view.
+
+Right column: Government summary (via GovernmentCard) and dynamic Headlines (champion, rank, cabinet strength, top prospect).
+
+Integrated TalentSearchModal with top-bar access.
+
+This page is now the main “team dashboard” equivalent for the controlled country.
+
+- First-pass UI refactor for core views:
+  - New world overview layout with left-hand navigation, top world/year header, and primary actions (Sim 1 Year, Reset World, My Country).
+  - Refreshed person page with grouped attribute blocks (Cognitive, Social/Influence, Physical, Personality), plus clearer sections for career, education, and relationships.
+  - Country Industry Structure page with industry tabs (Tech/Finance/Research), an aggregate output summary, and per-company cards that surface hierarchy slots and v0 performance scores.
+  - Youth Pipeline player view with sortable table of prospects, university eligibility flags, and a “Save admissions” workflow that posts selected 18-year-olds back to the server.
+  - Global Leaders and Office pages now show cleaner summaries and link through to office history and individual person profiles.
+  - Company hierarchy sidebar component that shows the full ladder from President down to Worker, including key stats for each person.
+- Talent Search modal for scouting people across the world by age, stats, employment status, and industry experience, with pagination and optional “Select” callbacks for future assignment flows.

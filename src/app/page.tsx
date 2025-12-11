@@ -1,8 +1,10 @@
-// src/app/page.tsx (or wherever HomePage lives)
 'use client';
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+
+import { SectionHeader } from '@/components/ui/SectionHeader';
+import { Panel } from '@/components/ui/Panel';
 
 export default function HomePage() {
   const [world, setWorld] = useState<any>(null);
@@ -40,7 +42,9 @@ export default function HomePage() {
   };
 
   const handleResetWorld = async () => {
-    if (!confirm('Reset world? This will delete and regenerate everything.')) return;
+    if (!confirm('Reset world? This will delete and regenerate everything.')) {
+      return;
+    }
 
     setResetting(true);
     try {
@@ -53,99 +57,105 @@ export default function HomePage() {
     }
   };
 
-  if (loading && !world) return <div className="p-4">Loading world…</div>;
-  if (!world) return <div className="p-4">No world found.</div>;
+  if (loading && !world) {
+    return <main className="px-3 py-4 md:px-4">Loading world…</main>;
+  }
+  if (!world) {
+    return <main className="px-3 py-4 md:px-4">No world found.</main>;
+  }
 
   const countries = world.countries ?? [];
   const samplePeople = world.samplePeople ?? [];
 
   return (
-    <main className="p-4 space-y-4">
-      <div className="flex items-start gap-6">
-        <div>
-          <h1 className="text-2xl font-bold">{world.name}</h1>
-          <p>Year: {world.currentYear}</p>
-
-          {/* Summary counts coming from /api/world */}
-          <p>Countries: {world.countriesCount ?? countries.length}</p>
-          <p>Total people: {world.peopleCount}</p>
-          <p>Sample people loaded: {samplePeople.length}</p>
-
-          <div className="mt-3 space-y-1 text-sm">
-            <p>
-              <Link href="/player" className="text-blue-600 underline">
-                View player →
-              </Link>
-            </p>
-            <p>
-              <Link href="/leaders" className="text-blue-600 underline">
-                View global leaders →
-              </Link>
-            </p>
-            <p>
-              {world.id && (
-                <Link
-                  href={`/world/${world.id}/standings`}
-                  className="text-blue-600 underline"
-                >
-                  View national standings →
-                </Link>
-              )}
-            </p>
+    <main className="px-3 py-4 md:px-4 md:py-6 space-y-6">
+      <SectionHeader
+        title={world.name}
+        eyebrow="World overview"
+        description={`Year ${world.currentYear} · Countries: ${
+          world.countriesCount ?? countries.length
+        } · Total people: ${world.peopleCount}`}
+        actions={
+          <div className="flex flex-col sm:flex-row gap-2">
+            <button
+              onClick={handleSimYear}
+              disabled={simulating}
+              className="px-3 py-1.5 rounded border border-gray-300 bg-white text-xs font-medium hover:bg-gray-50 disabled:opacity-50"
+            >
+              {simulating ? 'Simulating…' : 'Sim 1 Year'}
+            </button>
+            <button
+              onClick={handleResetWorld}
+              disabled={resetting}
+              className="px-3 py-1.5 rounded border border-red-200 bg-red-50 text-xs font-medium text-red-700 hover:bg-red-100 disabled:opacity-50"
+            >
+              {resetting ? 'Resetting…' : 'Reset World'}
+            </button>
           </div>
+        }
+      >
+        <div className="mt-2 text-sm space-x-3">
+          <Link href="/player" className="text-blue-600 underline">
+            View player →
+          </Link>
+          <Link href="/leaders" className="text-blue-600 underline">
+            View global leaders →
+          </Link>
+          {world.id && (
+            <Link
+              href={`/world/${world.id}/standings`}
+              className="text-blue-600 underline"
+            >
+              View national standings →
+            </Link>
+          )}
         </div>
+      </SectionHeader>
 
-        <div className="flex flex-col gap-2">
-          <button
-            onClick={handleSimYear}
-            disabled={simulating}
-            className="px-4 py-2 border rounded hover:bg-gray-100 disabled:opacity-50"
-          >
-            {simulating ? 'Simulating…' : 'Sim 1 Year'}
-          </button>
+      <div className="grid gap-4 md:grid-cols-2">
+        <Panel title="Countries">
+          {countries.length === 0 ? (
+            <p className="text-sm text-gray-600">
+              No countries in this world yet.
+            </p>
+          ) : (
+            <ul className="list-disc ml-5 text-sm space-y-0.5">
+              {countries.map((c: any) => (
+                <li key={c.id}>
+                  <Link
+                    href={`/country/${c.id}`}
+                    className="text-blue-600 underline"
+                  >
+                    {c.name}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Panel>
 
-          <button
-            onClick={handleResetWorld}
-            disabled={resetting}
-            className="px-4 py-2 border rounded hover:bg-red-50 disabled:opacity-50"
-          >
-            {resetting ? 'Resetting…' : 'Reset World'}
-          </button>
-        </div>
-      </div>
-
-      <div>
-        <h2 className="text-xl font-semibold">Countries</h2>
-        <ul className="list-disc ml-5">
-          {countries.map((c: any) => (
-            <li key={c.id}>
-              <Link
-                href={`/country/${c.id}`}
-                className="text-blue-600 underline"
-              >
-                {c.name}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      <div>
-        <h2 className="text-xl font-semibold">People (sample)</h2>
-        <ul className="list-disc ml-5">
-          {samplePeople.map((p: any) => (
-            <li key={p.id}>
-              <Link
-                href={`/person/${p.id}`}
-                className="text-blue-600 underline"
-              >
-                {p.name}
-              </Link>{' '}
-              — age {p.age} — countryId {p.countryId}
-              {!p.isAlive && ' (dead)'}
-            </li>
-          ))}
-        </ul>
+        <Panel title="People (sample)">
+          {samplePeople.length === 0 ? (
+            <p className="text-sm text-gray-600">
+              No sample people loaded yet.
+            </p>
+          ) : (
+            <ul className="list-disc ml-5 text-sm space-y-0.5">
+              {samplePeople.map((p: any) => (
+                <li key={p.id}>
+                  <Link
+                    href={`/person/${p.id}`}
+                    className="text-blue-600 underline"
+                  >
+                    {p.name}
+                  </Link>{' '}
+                  — age {p.age} — countryId {p.countryId}
+                  {!p.isAlive && ' (dead)'}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Panel>
       </div>
     </main>
   );

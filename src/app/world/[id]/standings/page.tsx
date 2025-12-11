@@ -1,11 +1,22 @@
-// app/world/[id]/standings/page.tsx
-'use client';
+// src/app/world/[id]/standings/page.tsx
+"use client";
 
-import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
-import Link from 'next/link';
+import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
+import Link from "next/link";
 
-type Trend = 'up' | 'down' | 'same' | 'new';
+import { Panel, PanelBody, PanelHeader } from "@/components/ui/Panel";
+import { SectionHeader } from "@/components/ui/SectionHeader";
+import {
+  Table,
+  TableHead,
+  TableBody,
+  TableRow,
+  Th,
+  Td,
+} from "@/components/ui/Table";
+
+type Trend = "up" | "down" | "same" | "new";
 
 type HistoryEntry = {
   year: number;
@@ -31,7 +42,6 @@ type ApiResponse = {
   standings: LeagueStanding[];
 };
 
-// Top companies types (unchanged)
 type TopCompany = {
   companyId: number;
   name: string;
@@ -51,22 +61,22 @@ type TopCompaniesResponse = {
 };
 
 const INDUSTRY_LABELS: Record<string, string> = {
-  TECH: 'Tech',
-  FINANCE: 'Finance',
-  RESEARCH: 'Research',
+  TECH: "Tech",
+  FINANCE: "Finance",
+  RESEARCH: "Research",
 };
 
 function TrendIcon({ trend }: { trend: Trend }) {
-  if (trend === 'up') {
+  if (trend === "up") {
     return <span className="text-green-600 text-sm">↑</span>;
   }
-  if (trend === 'down') {
+  if (trend === "down") {
     return <span className="text-red-600 text-sm">↓</span>;
   }
-  if (trend === 'same') {
+  if (trend === "same") {
     return <span className="text-gray-500 text-sm">→</span>;
   }
-  // 'new'
+  // "new"
   return <span className="text-blue-600 text-sm">•</span>;
 }
 
@@ -78,13 +88,12 @@ export default function WorldStandingsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Top companies state (unchanged)
   const [topCompanies, setTopCompanies] =
     useState<TopCompaniesResponse | null>(null);
   const [topLoading, setTopLoading] = useState(true);
   const [topError, setTopError] = useState<string | null>(null);
 
-  // --------- LOAD STANDINGS (CountryYearPerformance-based) ---------
+  // --------- LOAD STANDINGS ---------
   useEffect(() => {
     if (!id) return;
 
@@ -106,7 +115,7 @@ export default function WorldStandingsPage() {
         }
       } catch (e: any) {
         if (!cancelled) {
-          setError(e.message ?? 'Failed to load standings');
+          setError(e.message ?? "Failed to load standings");
         }
       } finally {
         if (!cancelled) {
@@ -121,7 +130,7 @@ export default function WorldStandingsPage() {
     };
   }, [id]);
 
-  // --------- LOAD TOP COMPANIES (unchanged) ---------
+  // --------- LOAD TOP COMPANIES ---------
   useEffect(() => {
     if (!id) return;
 
@@ -143,7 +152,7 @@ export default function WorldStandingsPage() {
         }
       } catch (e: any) {
         if (!cancelled) {
-          setTopError(e.message ?? 'Failed to load top companies');
+          setTopError(e.message ?? "Failed to load top companies");
         }
       } finally {
         if (!cancelled) {
@@ -158,19 +167,22 @@ export default function WorldStandingsPage() {
     };
   }, [id]);
 
-  // --------- EARLY RETURNS (NO HOOKS BELOW THIS LINE) ---------
+  // --------- EARLY RETURNS ---------
   if (loading) {
-    return <main className="p-4">Loading league table…</main>;
+    return (
+      <main className="p-4">
+        <p className="text-sm text-gray-600">Loading league table…</p>
+      </main>
+    );
   }
 
   if (error || !data) {
     return (
       <main className="p-4 space-y-3">
-        <p className="text-red-600">
-          Failed to load standings
-          {error ? `: ${error}` : '.'}
+        <p className="text-red-600 text-sm">
+          Failed to load standings{error ? `: ${error}` : "."}
         </p>
-        <Link href="/" className="text-blue-600 underline">
+        <Link href="/" className="text-blue-600 underline text-sm">
           ← Back to world overview
         </Link>
       </main>
@@ -185,129 +197,112 @@ export default function WorldStandingsPage() {
         <p className="text-sm text-gray-600">
           No world found in the database yet.
         </p>
-        <Link href="/" className="text-blue-600 underline">
+        <Link href="/" className="text-blue-600 underline text-sm">
           ← Back to world overview
         </Link>
       </main>
     );
   }
 
-  // Ensure standings are sorted by currentRank ascending
   const sortedStandings = [...standings].sort(
     (a, b) => a.currentRank - b.currentRank,
   );
 
   return (
-    <main className="p-4 space-y-8">
-      {/* Header */}
-      <header className="space-y-1">
-        <Link href="/" className="text-blue-600 underline">
-          ← Back to world overview
-        </Link>
-        <h1 className="text-2xl font-bold">Country Standings</h1>
-        <p className="text-sm text-gray-600">
-          World: {world.name} · Year {world.currentYear}
-        </p>
-        <p className="text-xs text-gray-500">
-          Countries are ranked by their <code>totalScore</code> from{' '}
-          <code>CountryYearPerformance</code> for the current season. Arrows
-          show movement compared to last year.
-        </p>
-      </header>
+    <main className="p-4 space-y-6">
+      <SectionHeader
+        title="Country Standings"
+        description={`World: ${world.name} · Year ${world.currentYear}`}
+        action={
+          <Link href="/" className="text-xs text-blue-600 hover:underline">
+            ← Back to world overview
+          </Link>
+        }
+      />
 
       {/* League Table */}
-      {sortedStandings.length === 0 ? (
-        <section>
+      <Panel id="standings">
+        <PanelHeader
+          title="League Table"
+          subtitle="Countries ranked by totalScore from CountryYearPerformance for the current season. Arrows show movement vs. last year."
+        />
+        {sortedStandings.length === 0 ? (
           <p className="text-sm text-gray-600">
             No league standings yet — simulate at least one year to generate
             country performance.
           </p>
-        </section>
-      ) : (
-        <section className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 text-sm">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                  Rank
-                </th>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                  Country
-                </th>
-                <th className="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                  Score
-                </th>
-                <th className="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                  Last Year
-                </th>
-                <th className="px-3 py-2 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                  Trend
-                </th>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                  Recent Seasons
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 bg-white">
-              {sortedStandings.map((row) => {
-                const historySorted = [...row.history].sort(
-                  (a, b) => a.year - b.year,
-                );
+        ) : (
+          <PanelBody>
+            <Table>
+              <TableHead>
+                <tr>
+                  <Th>Rank</Th>
+                  <Th>Country</Th>
+                  <Th align="right">Score</Th>
+                  <Th align="right">Last Year</Th>
+                  <Th align="center">Trend</Th>
+                  <Th>Recent Seasons</Th>
+                </tr>
+              </TableHead>
+              <TableBody>
+                {sortedStandings.map((row) => {
+                  const historySorted = [...row.history].sort(
+                    (a, b) => a.year - b.year,
+                  );
 
-                return (
-                  <tr
-                    key={row.countryId}
-                    className="hover:bg-gray-50 transition"
-                  >
-                    <td className="px-3 py-2 text-xs text-gray-500">
-                      {row.currentRank}
-                    </td>
-                    <td className="px-3 py-2">
-                      <Link
-                        href={`/country/${row.countryId}`}
-                        className="text-sm font-medium text-blue-700 hover:underline"
+                  return (
+                    <TableRow key={row.countryId}>
+                      <Td className="text-xs text-gray-500">
+                        {row.currentRank}
+                      </Td>
+                      <Td>
+                        <Link
+                          href={`/country/${row.countryId}`}
+                          className="text-sm font-medium text-blue-700 hover:underline"
+                        >
+                          {row.countryName}
+                        </Link>
+                      </Td>
+                      <Td align="right" className="text-sm">
+                        {row.totalScore.toFixed(1)}
+                      </Td>
+                      <Td
+                        align="right"
+                        className="text-xs text-gray-700 min-w-[40px]"
                       >
-                        {row.countryName}
-                      </Link>
-                    </td>
-                    <td className="px-3 py-2 text-right">
-                      {row.totalScore.toFixed(1)}
-                    </td>
-                    <td className="px-3 py-2 text-right text-xs text-gray-700">
-                      {row.lastYearRank != null ? row.lastYearRank : '–'}
-                    </td>
-                    <td className="px-3 py-2 text-center">
-                      <TrendIcon trend={row.trend} />
-                    </td>
-                    <td className="px-3 py-2 text-xs text-gray-600">
-                      {historySorted.length === 0 ? (
-                        <span>—</span>
-                      ) : (
-                        <span>
-                          {historySorted
-                            .map(
-                              (h) =>
-                                `${h.year}: ${h.totalScore.toFixed(1)}`,
-                            )
-                            .join(' · ')}
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </section>
-      )}
+                        {row.lastYearRank != null ? row.lastYearRank : "–"}
+                      </Td>
+                      <Td align="center">
+                        <TrendIcon trend={row.trend} />
+                      </Td>
+                      <Td className="text-[11px] text-gray-600">
+                        {historySorted.length === 0 ? (
+                          <span>—</span>
+                        ) : (
+                          <span>
+                            {historySorted
+                              .map(
+                                (h) =>
+                                  `${h.year}: ${h.totalScore.toFixed(1)}`,
+                              )
+                              .join(" · ")}
+                          </span>
+                        )}
+                      </Td>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </PanelBody>
+        )}
+      </Panel>
 
-      {/* Top companies (unchanged) */}
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Top Companies</h2>
+      {/* Top companies */}
+      <Panel id="top-companies">
+        <PanelHeader title="Top Companies" />
         {topLoading ? (
-          <p className="text-sm text-gray-600">
-            Loading top companies…
-          </p>
+          <p className="text-sm text-gray-600">Loading top companies…</p>
         ) : topError ? (
           <p className="text-sm text-red-600">
             Failed to load top companies: {topError}
@@ -317,59 +312,50 @@ export default function WorldStandingsPage() {
             No company performance data yet.
           </p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-xs border border-gray-200">
-              <thead className="bg-gray-50">
+          <PanelBody>
+            <Table dense>
+              <TableHead>
                 <tr>
-                  <th className="px-2 py-1 text-left border-b">Rank</th>
-                  <th className="px-2 py-1 text-left border-b">Company</th>
-                  <th className="px-2 py-1 text-left border-b">Country</th>
-                  <th className="px-2 py-1 text-left border-b">
-                    Industry
-                  </th>
-                  <th className="px-2 py-1 text-right border-b">
-                    Output
-                  </th>
+                  <Th>Rank</Th>
+                  <Th>Company</Th>
+                  <Th>Country</Th>
+                  <Th>Industry</Th>
+                  <Th align="right">Output</Th>
                 </tr>
-              </thead>
-              <tbody>
+              </TableHead>
+              <TableBody>
                 {topCompanies.companies.map((c, idx) => (
-                  <tr
-                    key={c.companyId}
-                    className="odd:bg-white even:bg-gray-50"
-                  >
-                    <td className="px-2 py-1 border-b align-middle">
-                      {idx + 1}
-                    </td>
-                    <td className="px-2 py-1 border-b align-middle">
+                  <TableRow key={c.companyId}>
+                    <Td>{idx + 1}</Td>
+                    <Td>
                       <Link
                         href={`/company/${c.companyId}`}
                         className="text-blue-600 hover:underline"
                       >
                         {c.name}
                       </Link>
-                    </td>
-                    <td className="px-2 py-1 border-b align-middle">
+                    </Td>
+                    <Td>
                       <Link
                         href={`/country/${c.countryId}`}
                         className="text-blue-600 hover:underline"
                       >
                         {c.countryName}
                       </Link>
-                    </td>
-                    <td className="px-2 py-1 border-b align-middle">
+                    </Td>
+                    <Td>
                       {INDUSTRY_LABELS[c.industry] ?? c.industry}
-                    </td>
-                    <td className="px-2 py-1 border-b text-right align-middle">
+                    </Td>
+                    <Td align="right" className="font-mono">
                       {c.outputScore.toFixed(1)}
-                    </td>
-                  </tr>
+                    </Td>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </TableBody>
+            </Table>
+          </PanelBody>
         )}
-      </section>
+      </Panel>
     </main>
   );
 }

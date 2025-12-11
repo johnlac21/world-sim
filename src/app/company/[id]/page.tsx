@@ -1,9 +1,22 @@
-'use client';
+// src/app/company/[id]/page.tsx
+"use client";
 
-import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { useParams } from 'next/navigation';
-import { TalentSearchModal } from '@/components/TalentSearchModal';
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useParams } from "next/navigation";
+
+import { TalentSearchModal } from "@/components/TalentSearchModal";
+import { Panel, PanelBody, PanelHeader } from "@/components/ui/Panel";
+import { SectionHeader } from "@/components/ui/SectionHeader";
+import {
+  Table,
+  TableHead,
+  TableBody,
+  TableRow,
+  Th,
+  Td,
+} from "@/components/ui/Table";
+import { DepthChartRow } from "@/components/ui/DepthChartRow";
 
 type HierarchyPerson = {
   id: number;
@@ -67,7 +80,6 @@ type IndustryPeer = {
   isThisCompany: boolean;
 };
 
-// Candidate from /api/player/companies/[companyId]/positions/[roleId]/candidates
 type PositionCandidate = {
   id: number;
   name: string;
@@ -96,7 +108,6 @@ export default function CompanyPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // edit-mode state
   const [editMode, setEditMode] = useState(false);
   const [candidatesByRole, setCandidatesByRole] = useState<
     Record<number, PositionCandidate[]>
@@ -105,7 +116,6 @@ export default function CompanyPage() {
   const [savingRole, setSavingRole] = useState<Record<number, boolean>>({});
   const [uiMessage, setUiMessage] = useState<string | null>(null);
 
-  // NEW: talent search modal state
   const [showTalentSearch, setShowTalentSearch] = useState(false);
 
   useEffect(() => {
@@ -136,7 +146,7 @@ export default function CompanyPage() {
         console.error(err);
         setError(
           err?.message ??
-            'Failed to load company hierarchy / performance',
+            "Failed to load company hierarchy / performance",
         );
       } finally {
         setLoading(false);
@@ -162,7 +172,7 @@ export default function CompanyPage() {
 
   const loadCandidatesForRole = async (roleId: number) => {
     if (!data) return;
-    if (candidatesByRole[roleId]) return; // already loaded
+    if (candidatesByRole[roleId]) return;
 
     try {
       setRoleLoadingFlag(roleId, true);
@@ -175,8 +185,7 @@ export default function CompanyPage() {
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(
-          body.error ||
-            `Failed to load candidates (status ${res.status})`,
+          body.error || `Failed to load candidates (status ${res.status})`,
         );
       }
 
@@ -190,7 +199,7 @@ export default function CompanyPage() {
     } catch (err: any) {
       console.error(err);
       setUiMessage(
-        err?.message ?? 'Failed to load candidates for this role.',
+        err?.message ?? "Failed to load candidates for this role.",
       );
     } finally {
       setRoleLoadingFlag(roleId, false);
@@ -215,8 +224,8 @@ export default function CompanyPage() {
       const res = await fetch(
         `/api/player/companies/${data.company.id}/positions/${roleId}/assign`,
         {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ personId, locked }),
         },
       );
@@ -224,12 +233,10 @@ export default function CompanyPage() {
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(
-          body.error ||
-            `Failed to assign position (status ${res.status})`,
+          body.error || `Failed to assign position (status ${res.status})`,
         );
       }
 
-      // Update local hierarchy state
       setHierarchy((hierarchy) =>
         hierarchy.map((slot) => {
           if (slot.roleId !== roleId) return slot;
@@ -238,7 +245,7 @@ export default function CompanyPage() {
             return {
               ...slot,
               occupied: false,
-              locked: false, // clearing slot also clears lock
+              locked: false,
               person: null,
             };
           }
@@ -248,7 +255,6 @@ export default function CompanyPage() {
             candidates.find((c) => c.id === personId) ?? null;
 
           if (!chosen) {
-            // fallback: keep same person ID but update locked flag
             return {
               ...slot,
               locked,
@@ -275,7 +281,7 @@ export default function CompanyPage() {
     } catch (err: any) {
       console.error(err);
       setUiMessage(
-        err?.message ?? 'Failed to update company hierarchy slot.',
+        err?.message ?? "Failed to update company hierarchy slot.",
       );
     } finally {
       setRoleSavingFlag(roleId, false);
@@ -283,14 +289,20 @@ export default function CompanyPage() {
   };
 
   if (loading) {
-    return <main className="p-4">Loading company…</main>;
+    return (
+      <main className="p-4">
+        <p className="text-sm text-gray-600">Loading company…</p>
+      </main>
+    );
   }
 
   if (error || !data || (data as any).error) {
     return (
       <main className="p-4 space-y-2">
-        <p>Company not found or failed to load.</p>
-        <Link href="/" className="text-blue-600 underline">
+        <p className="text-sm text-red-600">
+          Company not found or failed to load.
+        </p>
+        <Link href="/" className="text-blue-600 underline text-sm">
           ← Back to world
         </Link>
       </main>
@@ -307,13 +319,11 @@ export default function CompanyPage() {
     isEditable,
   } = data;
 
-  // For history chart
   const historyCount = performanceHistory.length;
   const hasHistoryTrend = historyCount >= 2;
   const outputs = performanceHistory
     .map((p) => p.outputScore)
     .filter((v) => Number.isFinite(v));
-
   const maxOutput = outputs.length > 0 ? Math.max(...outputs) : 0;
 
   const showBenchmark =
@@ -329,235 +339,241 @@ export default function CompanyPage() {
     <main className="flex flex-col md:flex-row">
       {/* MAIN CONTENT */}
       <section className="flex-1 p-4 space-y-6 md:p-6">
-        <header className="space-y-1">
-          <Link href="/" className="text-blue-600 underline">
-            ← Back to world
-          </Link>
-          <h1 className="text-2xl font-bold">{company.name}</h1>
-          <p className="text-sm text-gray-600">
-            Industry:{' '}
-            <span className="font-medium">{company.industry}</span>
-          </p>
-        </header>
-
-        <section className="space-y-2">
-          <h2 className="text-lg font-semibold">Company Overview</h2>
-          <p className="text-sm text-gray-600">
-            This page shows the company&apos;s current leadership hierarchy
-            in the sidebar and its simulated yearly performance below.
-          </p>
-        </section>
-
-        {/* PERFORMANCE (CURRENT YEAR) PANEL */}
-        <section className="border border-gray-200 rounded-lg bg-gray-50 p-4 shadow-sm space-y-4">
-          <h2 className="text-lg font-semibold">Performance (Current Year)</h2>
-
-          {latestPerformance === null ? (
-            <p className="text-sm text-gray-600">
-              No performance data yet — simulate a year to generate company
-              output.
-            </p>
-          ) : (
-            <div className="space-y-3">
-              <div>
-                <p className="text-sm font-medium">
-                  Performance — Year {latestPerformance.year}
-                </p>
-                <p className="mt-1 text-sm">
-                  Output Score:{' '}
-                  <span className="font-semibold">
-                    {latestPerformance.outputScore.toFixed(1)}
-                  </span>
-                </p>
-              </div>
-
-              <div className="text-sm text-gray-700 space-y-1">
-                <p className="font-medium">Breakdown:</p>
-                <p>
-                  Talent:{' '}
-                  <span className="font-mono">
-                    {latestPerformance.talentScore.toFixed(1)}
-                  </span>
-                </p>
-                <p>
-                  Leadership:{' '}
-                  <span className="font-mono">
-                    {latestPerformance.leadershipScore.toFixed(1)}
-                  </span>
-                </p>
-                <p>
-                  Reliability:{' '}
-                  <span className="font-mono">
-                    {latestPerformance.reliabilityScore.toFixed(1)}
-                  </span>
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* View in standings */}
-          <div className="pt-2 border-t border-gray-200 mt-2">
+        <SectionHeader
+          eyebrow="Company"
+          title={company.name}
+          description={
+            <>
+              Industry: <span className="font-semibold">{company.industry}</span>
+            </>
+          }
+          action={
             <Link
               href={`/world/${company.worldId}/standings`}
-              className="text-sm text-blue-600 hover:underline"
+              className="text-xs text-blue-600 hover:underline"
             >
-              View Country &amp; World Rankings →
+              ← Back to standings
             </Link>
-          </div>
-        </section>
+          }
+        />
 
-        {/* INDUSTRY BENCHMARK PANEL */}
-        <section className="border border-gray-200 rounded-lg bg-gray-50 p-4 shadow-sm space-y-3">
-          <h2 className="text-lg font-semibold">Industry Benchmark</h2>
-
-          {!showBenchmark ? (
+        <Panel>
+          <PanelHeader
+            title="Company Overview"
+            subtitle="Leadership hierarchy in the sidebar; simulated yearly performance and industry context below."
+          />
+          <PanelBody>
             <p className="text-sm text-gray-600">
-              No benchmark data yet — simulate a year to compare this company
-              to its industry.
+              This page shows the company&apos;s current leadership hierarchy and
+              its simulated yearly performance within the world.
             </p>
-          ) : (
-            <div className="space-y-2 text-sm text-gray-700">
-              <p className="font-medium">
-                Year {industryBenchmark.year} — {company.industry}
-              </p>
-              <p>
-                This company:{' '}
-                <span className="font-mono font-semibold">
-                  {industryBenchmark.companyOutput!.toFixed(1)}
-                </span>
-              </p>
-              <p>
-                Industry average:{' '}
-                <span className="font-mono">
-                  {industryBenchmark.industryAverage!.toFixed(1)}
-                </span>
-              </p>
-              {industryBenchmark.industryRank && (
-                <p className="text-xs text-gray-600">
-                  Rank {industryBenchmark.industryRank} of{' '}
-                  {industryBenchmark.totalCompanies} companies in this
-                  industry.
-                </p>
-              )}
-            </div>
-          )}
-        </section>
+          </PanelBody>
+        </Panel>
 
-        {/* INDUSTRY PEERS PANEL */}
-        <section className="border border-gray-200 rounded-lg bg-gray-50 p-4 shadow-sm space-y-3">
-          <div className="flex items-baseline justify-between">
-            <h2 className="text-lg font-semibold">Industry Peers</h2>
-            {hasPeers && peersYear !== null && (
-              <p className="text-xs text-gray-500">
-                Year {peersYear} — {industryPeers.length} companies
+        {/* PERFORMANCE (CURRENT YEAR) */}
+        <Panel>
+          <PanelHeader title="Performance (Current Year)" />
+          <PanelBody className="space-y-3">
+            {latestPerformance === null ? (
+              <p className="text-sm text-gray-600">
+                No performance data yet — simulate a year to generate company
+                output.
               </p>
+            ) : (
+              <div className="space-y-3">
+                <div>
+                  <p className="text-sm font-medium">
+                    Performance — Year {latestPerformance.year}
+                  </p>
+                  <p className="mt-1 text-sm">
+                    Output Score:{" "}
+                    <span className="font-semibold">
+                      {latestPerformance.outputScore.toFixed(1)}
+                    </span>
+                  </p>
+                </div>
+
+                <div className="text-sm text-gray-700 space-y-1">
+                  <p className="font-medium">Breakdown</p>
+                  <p>
+                    Talent:{" "}
+                    <span className="font-mono">
+                      {latestPerformance.talentScore.toFixed(1)}
+                    </span>
+                  </p>
+                  <p>
+                    Leadership:{" "}
+                    <span className="font-mono">
+                      {latestPerformance.leadershipScore.toFixed(1)}
+                    </span>
+                  </p>
+                  <p>
+                    Reliability:{" "}
+                    <span className="font-mono">
+                      {latestPerformance.reliabilityScore.toFixed(1)}
+                    </span>
+                  </p>
+                </div>
+              </div>
             )}
-          </div>
 
-          {!hasPeers ? (
-            <p className="text-sm text-gray-600">
-              No peer data yet — simulate a year to see other companies in
-              this industry.
-            </p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-xs">
-                <thead className="border-b border-gray-200 text-gray-500">
+            <div className="pt-2 border-t border-gray-200 mt-2">
+              <Link
+                href={`/world/${company.worldId}/standings`}
+                className="text-sm text-blue-600 hover:underline"
+              >
+                View Country &amp; World Rankings →
+              </Link>
+            </div>
+          </PanelBody>
+        </Panel>
+
+        {/* INDUSTRY BENCHMARK */}
+        <Panel>
+          <PanelHeader title="Industry Benchmark" />
+          <PanelBody className="space-y-2">
+            {!showBenchmark ? (
+              <p className="text-sm text-gray-600">
+                No benchmark data yet — simulate a year to compare this company
+                to its industry.
+              </p>
+            ) : (
+              <>
+                <p className="text-sm text-gray-700 font-medium">
+                  Year {industryBenchmark.year} — {company.industry}
+                </p>
+                <p className="text-sm text-gray-700">
+                  This company:{" "}
+                  <span className="font-mono font-semibold">
+                    {industryBenchmark.companyOutput!.toFixed(1)}
+                  </span>
+                </p>
+                <p className="text-sm text-gray-700">
+                  Industry average:{" "}
+                  <span className="font-mono">
+                    {industryBenchmark.industryAverage!.toFixed(1)}
+                  </span>
+                </p>
+                {industryBenchmark.industryRank && (
+                  <p className="text-xs text-gray-600">
+                    Rank {industryBenchmark.industryRank} of{" "}
+                    {industryBenchmark.totalCompanies} companies in this
+                    industry.
+                  </p>
+                )}
+              </>
+            )}
+          </PanelBody>
+        </Panel>
+
+        {/* INDUSTRY PEERS */}
+        <Panel>
+          <PanelHeader
+            title="Industry Peers"
+            subtitle={
+              hasPeers && peersYear !== null
+                ? `Year ${peersYear} — ${industryPeers.length} companies`
+                : undefined
+            }
+          />
+          <PanelBody>
+            {!hasPeers ? (
+              <p className="text-sm text-gray-600">
+                No peer data yet — simulate a year to see other companies in
+                this industry.
+              </p>
+            ) : (
+              <Table dense>
+                <TableHead>
                   <tr>
-                    <th className="py-1 pr-3 text-left">Rank</th>
-                    <th className="py-1 pr-3 text-left">Company</th>
-                    <th className="py-1 pr-3 text-left">Country</th>
-                    <th className="py-1 text-right">Output</th>
+                    <Th>Rank</Th>
+                    <Th>Company</Th>
+                    <Th>Country</Th>
+                    <Th align="right">Output</Th>
                   </tr>
-                </thead>
-                <tbody>
+                </TableHead>
+                <TableBody>
                   {industryPeers.map((peer) => {
                     const isSelf = peer.isThisCompany;
                     return (
-                      <tr
-                        key={peer.companyId}
-                        className={
-                          'border-b border-gray-100' +
-                          (isSelf ? ' bg-blue-50/70 font-medium' : '')
-                        }
-                      >
-                        <td className="py-1 pr-3">{peer.rank}</td>
-                        <td className="py-1 pr-3">
+                      <TableRow key={peer.companyId} highlight={isSelf}>
+                        <Td>{peer.rank}</Td>
+                        <Td>
                           {peer.companyName}
                           {isSelf && (
                             <span className="ml-1 text-[10px] text-blue-600">
                               (you)
                             </span>
                           )}
-                        </td>
-                        <td className="py-1 pr-3 text-gray-700">
+                        </Td>
+                        <Td className="text-gray-700">
                           {peer.countryName}
-                        </td>
-                        <td className="py-1 text-right font-mono">
+                        </Td>
+                        <Td align="right" className="font-mono">
                           {peer.outputScore.toFixed(1)}
-                        </td>
-                      </tr>
+                        </Td>
+                      </TableRow>
                     );
                   })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
-
-        {/* PERFORMANCE HISTORY PANEL */}
-        <section className="border border-gray-200 rounded-lg bg-gray-50 p-4 shadow-sm space-y-3">
-          <div className="flex items-baseline justify-between">
-            <h2 className="text-lg font-semibold">Performance History</h2>
-            {historyCount > 0 && (
-              <p className="text-xs text-gray-500">
-                Last {historyCount} year{historyCount === 1 ? '' : 's'}
-              </p>
+                </TableBody>
+              </Table>
             )}
-          </div>
+          </PanelBody>
+        </Panel>
 
-          {historyCount === 0 || !hasHistoryTrend ? (
-            <p className="text-sm text-gray-600">
-              Not enough history yet — simulate more years to see a
-              performance trend.
-            </p>
-          ) : (
-            <div className="mt-1">
-              {/* fixed chart height in px */}
-              <div className="flex items-end gap-2" style={{ height: 120 }}>
-                {performanceHistory.map((row) => {
-                  const rawOutput = Number.isFinite(row.outputScore)
-                    ? row.outputScore
-                    : 0;
+        {/* PERFORMANCE HISTORY */}
+        <Panel>
+          <PanelHeader
+            title="Performance History"
+            subtitle={
+              historyCount > 0
+                ? `Last ${historyCount} year${historyCount === 1 ? "" : "s"}`
+                : undefined
+            }
+          />
+          <PanelBody>
+            {historyCount === 0 || !hasHistoryTrend ? (
+              <p className="text-sm text-gray-600">
+                Not enough history yet — simulate more years to see a
+                performance trend.
+              </p>
+            ) : (
+              <div className="mt-1">
+                <div className="flex items-end gap-2" style={{ height: 120 }}>
+                  {performanceHistory.map((row) => {
+                    const rawOutput = Number.isFinite(row.outputScore)
+                      ? row.outputScore
+                      : 0;
 
-                  const max = maxOutput > 0 ? maxOutput : rawOutput || 1;
-                  let barHeight = Math.round((rawOutput / max) * 110); // <=110px
+                    const max = maxOutput > 0 ? maxOutput : rawOutput || 1;
+                    let barHeight = Math.round((rawOutput / max) * 110);
 
-                  if (barHeight > 0 && barHeight < 8) barHeight = 8;
-                  if (barHeight < 0) barHeight = 0;
+                    if (barHeight > 0 && barHeight < 8) barHeight = 8;
+                    if (barHeight < 0) barHeight = 0;
 
-                  return (
-                    <div
-                      key={row.year}
-                      className="flex flex-col items-center flex-1"
-                    >
+                    return (
                       <div
-                        className="w-3 rounded-t bg-blue-500"
-                        style={{ height: barHeight }}
-                        aria-label={`Year ${row.year} output ${rawOutput.toFixed(
-                          1,
-                        )}`}
-                      />
-                      <div className="mt-1 text-[10px] text-gray-600">
-                        Y{row.year}
+                        key={row.year}
+                        className="flex flex-col items-center flex-1"
+                      >
+                        <div
+                          className="w-3 rounded-t bg-blue-500"
+                          style={{ height: barHeight }}
+                          aria-label={`Year ${row.year} output ${rawOutput.toFixed(
+                            1,
+                          )}`}
+                        />
+                        <div className="mt-1 text-[10px] text-gray-600">
+                          Y{row.year}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          )}
-        </section>
+            )}
+          </PanelBody>
+        </Panel>
       </section>
 
       {/* SIDEBAR: HIERARCHY */}
@@ -574,7 +590,7 @@ export default function CompanyPage() {
                 onClick={() => setEditMode((v) => !v)}
                 className="rounded-full border border-gray-300 bg-white px-2 py-0.5 text-[11px] font-medium text-gray-700 hover:bg-gray-100"
               >
-                {editMode ? 'Done' : 'Edit'}
+                {editMode ? "Done" : "Edit"}
               </button>
             )}
             <button
@@ -609,23 +625,16 @@ export default function CompanyPage() {
               const isRoleSaving = savingRole[roleId] ?? false;
 
               return (
-                <li
+                <DepthChartRow
                   key={slot.roleId}
-                  className="rounded-md border border-gray-200 bg-white px-3 py-2 shadow-sm"
+                  title={slot.roleName}
+                  rankLabel={`Rank ${slot.rank}`}
+                  muted={!slot.occupied}
                 >
-                  <div className="flex items-baseline justify-between gap-2">
-                    <span className="text-xs font-semibold text-gray-800">
-                      {slot.roleName}
-                    </span>
-                    <span className="text-[10px] text-gray-400 uppercase">
-                      Rank {slot.rank}
-                    </span>
-                  </div>
-
                   {!editMode && (
                     <>
                       {slot.occupied && slot.person ? (
-                        <div className="mt-1">
+                        <>
                           <p className="text-xs font-medium text-gray-800">
                             {slot.person.name}
                             <span className="ml-1 text-[10px] text-gray-500">
@@ -638,12 +647,12 @@ export default function CompanyPage() {
                             )}
                           </p>
                           <p className="mt-0.5 text-[11px] text-gray-600">
-                            Int {slot.person.intelligence} · Lead{' '}
-                            {slot.person.leadership} · Disc{' '}
-                            {slot.person.discipline} · Cha{' '}
+                            Int {slot.person.intelligence} · Lead{" "}
+                            {slot.person.leadership} · Disc{" "}
+                            {slot.person.discipline} · Cha{" "}
                             {slot.person.charisma}
                           </p>
-                        </div>
+                        </>
                       ) : (
                         <p className="mt-1 text-xs italic text-gray-400">
                           Vacant — will be filled next sim year if candidates
@@ -655,7 +664,6 @@ export default function CompanyPage() {
 
                   {editMode && (
                     <div className="mt-2 space-y-2">
-                      {/* Lock toggle (only when occupied) */}
                       <div className="flex items-center justify-between gap-2">
                         <label className="flex items-center gap-1 text-[11px] text-gray-600">
                           <input
@@ -681,7 +689,6 @@ export default function CompanyPage() {
                         )}
                       </div>
 
-                      {/* Candidate selector */}
                       <div className="space-y-1">
                         <div className="flex items-center justify-between gap-2">
                           <span className="text-[11px] text-gray-600">
@@ -694,21 +701,21 @@ export default function CompanyPage() {
                             className="rounded-full border border-gray-300 bg-gray-50 px-2 py-0.5 text-[10px] text-gray-700 hover:bg-gray-100"
                           >
                             {isRoleLoading
-                              ? 'Loading…'
+                              ? "Loading…"
                               : candidates.length === 0
-                              ? 'Load candidates'
-                              : 'Refresh'}
+                              ? "Load candidates"
+                              : "Refresh"}
                           </button>
                         </div>
 
                         {candidates.length > 0 && (
                           <select
                             className="mt-1 w-full rounded border border-gray-300 bg-white px-2 py-1 text-[11px]"
-                            value={slot.person?.id ?? ''}
+                            value={slot.person?.id ?? ""}
                             onChange={async (e) => {
                               const val = e.target.value;
                               const personId =
-                                val === '' ? null : Number(val) || null;
+                                val === "" ? null : Number(val) || null;
                               await assignRole({
                                 roleId,
                                 personId,
@@ -725,7 +732,7 @@ export default function CompanyPage() {
                                 {c.name} ({c.age}) — fit {c.roleFitScore}
                                 {c.currentRoleName
                                   ? `, currently ${c.currentRoleName}`
-                                  : ''}
+                                  : ""}
                               </option>
                             ))}
                           </select>
@@ -739,7 +746,7 @@ export default function CompanyPage() {
                       </div>
                     </div>
                   )}
-                </li>
+                </DepthChartRow>
               );
             })}
           </ul>
@@ -755,9 +762,7 @@ export default function CompanyPage() {
           isOpen={showTalentSearch}
           onClose={() => setShowTalentSearch(false)}
           onSelectPerson={(person) => {
-            // For now, just open their profile in a new tab.
-            // Later you can wire this into a "hire then assign" flow.
-            window.open(`/person/${person.id}`, '_blank');
+            window.open(`/person/${person.id}`, "_blank");
           }}
           selectLabel="View profile"
         />

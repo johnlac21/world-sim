@@ -5,6 +5,17 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { GovernmentCard } from "@/components/GovernmentCard";
 import { TalentSearchModal } from "@/components/TalentSearchModal";
+import { Panel, PanelBody, PanelHeader } from "@/components/ui/Panel";
+import { SectionHeader } from "@/components/ui/SectionHeader";
+import {
+  Table,
+  TableHead,
+  TableBody,
+  TableRow,
+  Th,
+  Td,
+} from "@/components/ui/Table";
+import { StatBadge } from "@/components/ui/StatBadge";
 
 type GovernmentOfficeSummary = {
   officeId: number;
@@ -48,7 +59,7 @@ type StandingsRow = {
   companyScore: number;
   governmentScore: number;
   populationScore: number;
-  rankChange?: number | null; // +1, -1, 0, or null if unknown
+  rankChange?: number | null;
 };
 
 type StandingsResponse = {
@@ -80,10 +91,8 @@ export default function PlayerDashboardPage() {
   const [standingsLoading, setStandingsLoading] = useState(false);
   const [youthLoading, setYouthLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
   const [talentOpen, setTalentOpen] = useState(false);
 
-  // Load player-country payload
   useEffect(() => {
     let cancelled = false;
 
@@ -119,7 +128,6 @@ export default function PlayerDashboardPage() {
     };
   }, []);
 
-  // Load mini-standings once we know worldId
   useEffect(() => {
     if (!player) return;
     let cancelled = false;
@@ -128,16 +136,13 @@ export default function PlayerDashboardPage() {
       try {
         setStandingsLoading(true);
         const res = await fetch(`/api/world/${player.worldId}/standings`);
-        if (!res.ok) {
-          // Standings are optional; fail silently
-          return;
-        }
+        if (!res.ok) return;
         const json = (await res.json()) as StandingsResponse;
         if (!cancelled) {
           setStandings(json.countries);
         }
       } catch {
-        // ignore; mini-standings just won’t render
+        // ignore
       } finally {
         if (!cancelled) setStandingsLoading(false);
       }
@@ -149,7 +154,6 @@ export default function PlayerDashboardPage() {
     };
   }, [player]);
 
-  // Load youth prospects quick view
   useEffect(() => {
     let cancelled = false;
     async function fetchYouth() {
@@ -159,12 +163,11 @@ export default function PlayerDashboardPage() {
         if (!res.ok) return;
         const json = (await res.json()) as YouthResponse;
         if (!cancelled) {
-          // take top 3 prospects for the quick widget
           const top3 = [...json.prospects].slice(0, 3);
           setYouth(top3);
         }
       } catch {
-        // ignore; youth quick view is optional
+        // ignore
       } finally {
         if (!cancelled) setYouthLoading(false);
       }
@@ -187,6 +190,12 @@ export default function PlayerDashboardPage() {
 
     if (player.performance) {
       const p = player.performance;
+
+      const totalLabel =
+        typeof p.totalScore === "number" && Number.isFinite(p.totalScore)
+          ? Math.round(p.totalScore)
+          : "—";
+
       if (p.champion) {
         items.push({
           tag: "CHAMPION",
@@ -200,9 +209,7 @@ export default function PlayerDashboardPage() {
       } else {
         items.push({
           tag: "SEASON",
-          text: `${player.name} is competing this year with total score ${Math.round(
-            p.totalScore,
-          )}.`,
+          text: `${player.name} is competing this year with total score ${totalLabel}.`,
         });
       }
 
@@ -250,115 +257,108 @@ export default function PlayerDashboardPage() {
 
   return (
     <>
-      {/* Page title */}
-      <div className="mb-4 flex items-baseline justify-between">
-        <div>
-          <h1 className="text-xl font-semibold">
-            {player.name} — Country Dashboard
-          </h1>
-          <p className="text-xs text-gray-600">
-            {player.worldName} · Managed country overview, performance, youth pipeline, and government.
-          </p>
-        </div>
+      <SectionHeader
+        title={`${player.name} — Country Dashboard`}
+        description={`${player.worldName} · Managed country overview, performance, youth pipeline, and government.`}
+        action={
+          <button
+            className="text-xs text-blue-600 hover:underline"
+            onClick={() => setTalentOpen(true)}
+          >
+            Open Talent Search
+          </button>
+        }
+      />
 
-        <button
-          className="text-xs text-blue-600 hover:underline"
-          onClick={() => setTalentOpen(true)}
-        >
-          Open Talent Search
-        </button>
-      </div>
-
-      {/* 3-column layout: left = mini-standings, center = country dashboard, right = gov + headlines */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
-        {/* LEFT COLUMN: mini-standings */}
+        {/* LEFT COLUMN: mini-standings + summary */}
         <div className="lg:col-span-1 space-y-3">
-          <div className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
-            <div className="mb-2 flex items-center justify-between">
-              <h2 className="text-sm font-semibold">Mini Standings</h2>
-              <Link
-                href={`/world/${player.worldId}/standings`}
-                className="text-[11px] text-blue-600 hover:underline"
-              >
-                View all
-              </Link>
-            </div>
-
+          <Panel>
+            <PanelHeader
+              title="Mini Standings"
+              action={
+                <Link
+                  href={`/world/${player.worldId}/standings`}
+                  className="text-[11px] text-blue-600 hover:underline"
+                >
+                  View all
+                </Link>
+              }
+            />
             {standingsLoading && (
               <p className="text-xs text-gray-500">Loading standings…</p>
             )}
-
             {!standingsLoading && standings && standings.length > 0 ? (
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b text-[11px] text-gray-500">
-                    <th className="py-1 text-left">#</th>
-                    <th className="py-1 text-left">Country</th>
-                    <th className="py-1 text-right">Total</th>
+              <Table dense>
+                <TableHead>
+                  <tr>
+                    <Th>#</Th>
+                    <Th>Country</Th>
+                    <Th align="right">Total</Th>
                   </tr>
-                </thead>
-                <tbody>
+                </TableHead>
+                <TableBody>
                   {standings.slice(0, 6).map((row) => {
                     const isYou = row.countryId === player.countryId;
                     return (
-                      <tr
-                        key={row.countryId}
-                        className={
-                          "border-b last:border-0" +
-                          (isYou ? " bg-blue-50/60" : " odd:bg-white even:bg-gray-50")
-                        }
-                      >
-                        <td className="py-1 pr-2 text-[11px] text-gray-600">
+                      <TableRow key={row.countryId} highlight={isYou}>
+                        <Td className="text-[11px] text-gray-600">
                           {row.rank}
-                        </td>
-                        <td className="py-1 pr-2">
+                        </Td>
+                        <Td>
                           <span
                             className={
                               "truncate text-xs " +
-                              (isYou ? "font-semibold text-blue-800" : "text-gray-800")
+                              (isYou
+                                ? "font-semibold text-blue-800"
+                                : "text-gray-800")
                             }
                           >
                             {row.countryName}
                           </span>
-                        </td>
-                        <td className="py-1 pl-2 text-right font-mono text-[11px] text-gray-700">
+                        </Td>
+                        <Td
+                          align="right"
+                          className="font-mono text-[11px] text-gray-700"
+                        >
                           {Math.round(row.totalScore)}
-                        </td>
-                      </tr>
+                        </Td>
+                      </TableRow>
                     );
                   })}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             ) : !standingsLoading ? (
               <p className="text-xs text-gray-500">
                 Standings are not available yet. Sim a year to generate standings.
               </p>
             ) : null}
-          </div>
+          </Panel>
 
-          {/* Quick controlled-country rank summary */}
           {controlledStanding && (
-            <div className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
-              <h3 className="text-sm font-semibold mb-1">Your Standing</h3>
+            <Panel variant="subtle" padding="sm">
+              <PanelHeader title="Your Standing" size="sm" />
               <p className="text-xs text-gray-700 mb-1">
-                Ranked <span className="font-semibold">#{controlledStanding.rank}</span>{" "}
+                Ranked{" "}
+                <span className="font-semibold">
+                  #{controlledStanding.rank}
+                </span>{" "}
                 out of {standings?.length ?? "?"} countries.
               </p>
               <p className="text-[11px] text-gray-600">
-                Total score {Math.round(controlledStanding.totalScore)} · Company{" "}
+                Total {Math.round(controlledStanding.totalScore)} · Company{" "}
                 {Math.round(controlledStanding.companyScore)} · Government{" "}
                 {Math.round(controlledStanding.governmentScore)}
               </p>
-            </div>
+            </Panel>
           )}
         </div>
 
-        {/* CENTER COLUMN: country stats & performance */}
+        {/* CENTER COLUMN */}
         <div className="lg:col-span-2 space-y-4">
-          {/* Country overview */}
-          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-            <h2 className="text-sm font-semibold mb-2">Country Overview</h2>
-            <div className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
+          <Panel>
+            <PanelHeader title="Country Overview" />
+            <PanelBody className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
               <OverviewStat label="Population" value={player.population} />
               <OverviewStat label="Companies" value={player.companies} />
               <OverviewStat label="Schools" value={player.schools} />
@@ -374,23 +374,21 @@ export default function PlayerDashboardPage() {
                   (player.unemployed / Math.max(player.population, 1)) * 100,
                 )}% of population)`}
               />
-            </div>
-          </div>
+            </PanelBody>
+          </Panel>
 
-          {/* Performance this year */}
-          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-            <div className="mb-2 flex items-center justify-between">
-              <h2 className="text-sm font-semibold">
-                Performance {perf ? `— Year ${perf.year}` : ""}
-              </h2>
-              <Link
-                href={`/country/${player.countryId}`}
-                className="text-[11px] text-blue-600 hover:underline"
-              >
-                View country history
-              </Link>
-            </div>
-
+          <Panel>
+            <PanelHeader
+              title={`Performance${perf ? ` — Year ${perf.year}` : ""}`}
+              action={
+                <Link
+                  href={`/country/${player.countryId}`}
+                  className="text-[11px] text-blue-600 hover:underline"
+                >
+                  View country history
+                </Link>
+              }
+            />
             {perf ? (
               <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-4">
                 <OverviewStat
@@ -424,86 +422,76 @@ export default function PlayerDashboardPage() {
               </div>
             ) : (
               <p className="text-xs text-gray-600">
-                No performance records yet. Sim a year to generate company and country
-                scores.
+                No performance records yet. Sim a year to generate company and
+                country scores.
               </p>
             )}
-          </div>
+          </Panel>
 
-          {/* Youth pipeline quick view */}
-          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-            <div className="mb-2 flex items-center justify-between">
-              <h2 className="text-sm font-semibold">Youth Pipeline</h2>
-              <Link
-                href="/player/youth"
-                className="text-[11px] text-blue-600 hover:underline"
-              >
-                View full pipeline
-              </Link>
-            </div>
-
+          <Panel>
+            <PanelHeader
+              title="Youth Pipeline"
+              action={
+                <Link
+                  href="/player/youth"
+                  className="text-[11px] text-blue-600 hover:underline"
+                >
+                  View full pipeline
+                </Link>
+              }
+            />
             {youthLoading && (
               <p className="text-xs text-gray-600">Loading prospects…</p>
             )}
 
             {!youthLoading && youth && youth.length > 0 ? (
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b text-[11px] text-gray-500">
-                    <th className="py-1 text-left">Prospect</th>
-                    <th className="py-1 text-left">Age</th>
-                    <th className="py-1 text-left">Education</th>
-                    <th className="py-1 text-right">Grade</th>
+              <Table dense>
+                <TableHead>
+                  <tr>
+                    <Th>Prospect</Th>
+                    <Th>Age</Th>
+                    <Th>Education</Th>
+                    <Th align="right">Grade</Th>
                   </tr>
-                </thead>
-                <tbody>
+                </TableHead>
+                <TableBody>
                   {youth.map((p) => (
-                    <tr
-                      key={p.id}
-                      className="border-b last:border-0 odd:bg-white even:bg-gray-50"
-                    >
-                      <td className="py-1 pr-2">
+                    <TableRow key={p.id}>
+                      <Td>
                         <Link
                           href={`/person/${p.id}`}
                           className="text-blue-600 hover:underline"
                         >
                           {p.name}
                         </Link>
-                      </td>
-                      <td className="py-1 pr-2 text-xs text-gray-700">{p.age}</td>
-                      <td className="py-1 pr-2 text-xs text-gray-700">
-                        {p.educationLabel}
-                      </td>
-                      <td className="py-1 pl-2 text-right text-xs text-gray-800">
+                      </Td>
+                      <Td>{p.age}</Td>
+                      <Td>{p.educationLabel}</Td>
+                      <Td align="right">
                         {p.prospectGrade} ({Math.round(p.prospectScore)})
-                      </td>
-                    </tr>
+                      </Td>
+                    </TableRow>
                   ))}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             ) : !youthLoading ? (
               <p className="text-xs text-gray-600">
                 No youth prospects surfaced yet. Sim a few years for teenagers to
                 appear.
               </p>
             ) : null}
-          </div>
+          </Panel>
         </div>
 
-        {/* RIGHT COLUMN: government + headlines */}
+        {/* RIGHT COLUMN */}
         <div className="lg:col-span-1 space-y-4">
-          {/* Government card (reusing your existing component) */}
           <GovernmentCard offices={player.offices} />
 
-          {/* Headlines */}
-          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-            <div className="mb-2 flex items-center justify-between">
-              <h2 className="text-sm font-semibold">Headlines</h2>
-              <span className="text-[11px] text-gray-500">
-                Season recap & story hooks
-              </span>
-            </div>
-
+          <Panel>
+            <PanelHeader
+              title="Headlines"
+              subtitle="Season recap & story hooks"
+            />
             {headlines.length === 0 ? (
               <p className="text-xs text-gray-600">
                 Sim a few years to generate meaningful stories about your country.
@@ -515,11 +503,10 @@ export default function PlayerDashboardPage() {
                 ))}
               </div>
             )}
-          </div>
+          </Panel>
         </div>
       </div>
 
-      {/* Talent search modal */}
       <TalentSearchModal
         worldId={player.worldId}
         defaultCountryId={player.countryId}
@@ -550,7 +537,7 @@ function OverviewStat({ label, value, big, highlight, note }: OverviewStatProps)
   }
 
   return (
-    <div className="flex flex-col rounded-md border border-gray-200 bg-white/60 px-2 py-2">
+    <div className="flex flex-col rounded-md border border-gray-200 bg:white/60 px-2 py-2">
       <span className="text-[11px] font-medium text-gray-500">{label}</span>
       <span
         className={
@@ -562,14 +549,11 @@ function OverviewStat({ label, value, big, highlight, note }: OverviewStatProps)
         {display}
       </span>
       {note && (
-        <span className="mt-0.5 text-[11px] text-gray-500">
-          {note}
-        </span>
+        <span className="mt-0.5 text-[11px] text-gray-500">{note}</span>
       )}
     </div>
   );
 }
-
 
 type HeadlineCardProps = {
   tag: string;
@@ -577,25 +561,18 @@ type HeadlineCardProps = {
 };
 
 function HeadlineCard({ tag, text }: HeadlineCardProps) {
-  const colorClasses =
+  const variant =
     tag === "CHAMPION"
-      ? "bg-yellow-100 text-yellow-800"
+      ? "warning"
       : tag === "PROSPECT"
-      ? "bg-green-100 text-green-800"
+      ? "success"
       : tag === "GOVERNMENT"
-      ? "bg-sky-100 text-sky-800"
-      : "bg-gray-100 text-gray-800";
+      ? "info"
+      : "neutral";
 
   return (
     <div className="flex items-start gap-2 rounded-md border border-gray-200 bg-[#fafafa] px-2 py-2">
-      <span
-        className={
-          "mt-0.5 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold " +
-          colorClasses
-        }
-      >
-        {tag}
-      </span>
+      <StatBadge label={tag} variant={variant} />
       <p className="text-xs text-gray-800">{text}</p>
     </div>
   );

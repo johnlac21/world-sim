@@ -4,6 +4,13 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 
+import { SectionHeader } from '@/components/ui/SectionHeader';
+import { Panel } from '@/components/ui/Panel';
+import { StatBadge } from '@/components/ui/StatBadge';
+// at the top of src/app/person/[id]/page.tsx
+import { StatPill } from '@/components/ui/StatPill';
+
+
 // === STAT BLOCK ===
 type StatBlock = {
   // Cognitive
@@ -102,10 +109,7 @@ type PersonPayload = {
 };
 
 // layout for grouped rendering
-const STAT_LAYOUT: Record<
-  string,
-  { key: keyof StatBlock; label: string }[]
-> = {
+const STAT_LAYOUT: Record<string, { key: keyof StatBlock; label: string }[]> = {
   Cognitive: [
     { key: 'intelligence', label: 'Intelligence' },
     { key: 'memory', label: 'Memory' },
@@ -164,12 +168,12 @@ export default function PersonPage() {
   }, [id]);
 
   if (loading) {
-    return <main className="p-4">Loading person…</main>;
+    return <main className="px-3 py-4 md:px-4">Loading person…</main>;
   }
 
   if (!data || (data as any).error) {
     return (
-      <main className="p-4 space-y-2">
+      <main className="px-3 py-4 md:px-4 space-y-2">
         <p>Person not found.</p>
         <Link href="/" className="text-blue-600 underline">
           ← Back to world
@@ -180,32 +184,26 @@ export default function PersonPage() {
 
   const { stats } = data;
 
-  return (
-    <main className="p-4 space-y-6">
-      <header className="space-y-1">
-        <Link href="/" className="text-blue-600 underline text-sm">
-          ← Back to world
-        </Link>
-        <h1 className="text-2xl font-bold">
-          {data.name}{' '}
-          {data.isPlayer && (
-            <span className="text-sm text-gray-600">(Player)</span>
-          )}
-        </h1>
-        <p>
-          Age {data.age} {data.isAlive ? '' : '(deceased)'}
-        </p>
-        <p className="text-sm text-gray-600">
-          World: {data.worldName}
-          {data.countryName ? ` · Country: ${data.countryName}` : ''}
-        </p>
-        <p className="text-sm text-gray-600">Born in year {data.birthYear}</p>
+  const descriptionPieces: string[] = [];
+  descriptionPieces.push(`Age ${data.age}${data.isAlive ? '' : ' (deceased)'}`);
+  descriptionPieces.push(`World: ${data.worldName}`);
+  if (data.countryName) descriptionPieces.push(`Country: ${data.countryName}`);
+  descriptionPieces.push(`Born in year ${data.birthYear}`);
 
-        <p className="text-sm text-gray-700 mt-1">
+  return (
+    <main className="px-3 py-4 md:px-4 md:py-6 space-y-6">
+      <SectionHeader
+        title={data.name}
+        eyebrow={data.isPlayer ? 'Player-controlled person' : 'Person'}
+        description={descriptionPieces.join(' · ')}
+        backHref="/"
+        backLabel="Back to world"
+      >
+        <p className="mt-1 text-sm text-gray-700">
           <span className="font-semibold">Personality:</span>{' '}
           {data.personalityArchetype} — {data.personalitySubtype}
         </p>
-      </header>
+      </SectionHeader>
 
       {/* ===== Attributes ===== */}
       <section>
@@ -213,29 +211,34 @@ export default function PersonPage() {
 
         <div className="grid gap-4 md:grid-cols-2">
           {Object.entries(STAT_LAYOUT).map(([groupName, groupStats]) => (
-            <div key={groupName}>
-              <h3 className="font-semibold text-sm mb-1">{groupName}</h3>
-              <ul className="list-disc ml-6 text-sm">
+            <div key={groupName} className="rounded-xl border border-gray-200 bg-white/80 p-3">
+              <h3 className="font-semibold text-xs mb-2 text-gray-600 uppercase tracking-wide">
+                {groupName}
+              </h3>
+              <div className="space-y-1">
                 {groupStats.map(({ key, label }) => (
-                  <li key={key}>
-                    {label}: {stats[key]}
-                  </li>
+                  <StatPill
+                    key={key}
+                    label={label}
+                    value={stats[key]}
+                    max={20} // your stat scale
+                  />
                 ))}
-              </ul>
+              </div>
             </div>
           ))}
         </div>
       </section>
 
+
       {/* ===== Career ===== */}
-      <section>
-        <h2 className="text-xl font-semibold mb-2">Career</h2>
+      <Panel title="Career">
         {data.currentJob ? (
           <p className="text-sm mb-2">
             Current job: {data.currentJob.title} at{' '}
             <Link
               href={`/company/${data.currentJob.companyId}`}
-              className="text-blue-600 underline"
+              className="text-blue-600 hover:underline"
             >
               {data.currentJob.companyName}
             </Link>{' '}
@@ -248,14 +251,14 @@ export default function PersonPage() {
 
         {data.pastJobs.length > 0 && (
           <>
-            <h3 className="font-semibold text-sm mt-2">Job history</h3>
-            <ul className="list-disc ml-6 text-sm">
+            <h3 className="font-semibold text-sm mt-2 mb-1">Job history</h3>
+            <ul className="list-disc ml-6 text-sm space-y-0.5">
               {data.pastJobs.map((j) => (
                 <li key={j.id}>
                   {j.title} at{' '}
                   <Link
                     href={`/company/${j.companyId}`}
-                    className="text-blue-600 underline"
+                    className="text-blue-600 hover:underline"
                   >
                     {j.companyName}
                   </Link>{' '}
@@ -266,11 +269,10 @@ export default function PersonPage() {
             </ul>
           </>
         )}
-      </section>
+      </Panel>
 
       {/* ===== Education ===== */}
-      <section>
-        <h2 className="text-xl font-semibold mb-2">Education</h2>
+      <Panel title="Education">
         {data.currentEnrollment ? (
           <p className="text-sm mb-2">
             Currently at {data.currentEnrollment.schoolName} (
@@ -283,8 +285,8 @@ export default function PersonPage() {
 
         {data.pastEnrollments.length > 0 && (
           <>
-            <h3 className="font-semibold text-sm mt-2">Past schools</h3>
-            <ul className="list-disc ml-6 text-sm">
+            <h3 className="font-semibold text-sm mt-2 mb-1">Past schools</h3>
+            <ul className="list-disc ml-6 text-sm space-y-0.5">
               {data.pastEnrollments.map((e) => (
                 <li key={e.id}>
                   {e.schoolName} ({e.level}) — {e.startYear}
@@ -294,20 +296,19 @@ export default function PersonPage() {
             </ul>
           </>
         )}
-      </section>
+      </Panel>
 
       {/* ===== Relationships ===== */}
-      <section>
-        <h2 className="text-xl font-semibold mb-2">Relationships</h2>
+      <Panel title="Relationships">
         {data.spouses.length === 0 ? (
           <p className="text-sm">No recorded marriages.</p>
         ) : (
-          <ul className="list-disc ml-6 text-sm">
+          <ul className="list-disc ml-6 text-sm space-y-0.5">
             {data.spouses.map((s) => (
               <li key={s.marriageId}>
                 <Link
                   href={`/person/${s.spouseId}`}
-                  className="text-blue-600 underline"
+                  className="text-blue-600 hover:underline"
                 >
                   {s.spouseName}
                 </Link>{' '}
@@ -317,7 +318,7 @@ export default function PersonPage() {
             ))}
           </ul>
         )}
-      </section>
+      </Panel>
     </main>
   );
 }

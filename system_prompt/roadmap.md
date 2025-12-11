@@ -1,106 +1,116 @@
 WORLD SIM BBGM — ROADMAP
 
 A structured roadmap for the world simulation game.
-Updated after each completed ticket:
 
-README.md → append to “Recent Additions”
-DEVELOPER_ONBOARDING.md → append to “Dev Changelog”
-ROADMAP.md → move completed ticket to Section 4 + LLM proposes next ticket(s)
+After every completed ticket:
 
-==================================================
+README.md → add to Recent Additions
+
+DEVELOPER_ONBOARDING.md → add to Dev Changelog
+
+ROADMAP.md → move completed ticket to Section 4 and insert an LLM-generated replacement ticket into Section 1
+
 1. NEXT TICKETS (ACTIVE BACKLOG)
-==================================================
 
-(Only this section changes every iteration.
-Keep ~3–7 items here at all times.
-The LLM inserts new tickets after a completion.)
+(This section changes each iteration. Maintain ~3–7 active items.)
 
-Current backlog:
+Shared UI Components Library
 
-23. UI Layout Shell (BBGM-style top nav + sidebar + page wrapper)
-    (Global page frame used across /player, /company/[id], /world/[id]/standings, etc.)
+Standardized UI primitives (cards, tables, headers, depth-chart rows, badges).
 
-24. Player Dashboard UI v2 (BBGM-style three-column layout:
-    mini-standings, country dashboard panels, world headlines)
+Company Page UI v2
 
-25. Shared UI Components Library
-    (Tables, panels/cards, standings rows, depth chart blocks, section headers)
+Two-column BBGM layout, upgraded hierarchy sidebar, performance panels.
 
-26. Company Page UI v2
-    (BBGM depth-chart layout, two-column structure, cleaner performance panels)
+Standings Page UI v2
 
-27. Standings Page UI v2
-    (BBGM table styling, trend arrows, better per-industry summaries)
+Improved table styling, trend arrows, per-industry summaries.
 
-28. Person Page UI v2
-    (BBGM player-card layout, attributes grid, career performance table)
+Person Page UI v2
 
-==================================================
+Player-card style layout, attribute grid, timeline view, PYP integration.
+
+Season Headlines & Event Feed v1
+
+Automatic yearly recap generated after each sim-year; displayed on /player and /world.
+
 2. UPCOMING SYSTEMS (MEDIUM-TERM)
-==================================================
 
-These systems will eventually be decomposed into multiple fine-grained tickets.
+(Stable; not modified.)
 
 Industry Roles System v1
+
 Company Position System v1
+
 Personality Archetypes & Behavioral Traits
+
 Dynamic Talent Pipeline (youth → education → companies)
+
 Company Performance v2 (bonuses, multipliers, prestige curves)
+
 Country Performance v2 (gov score v2, population productivity, investments)
+
 Player Actions & Country Management Menu
+
 Simulation Settings (speed, seeds, auto-sim)
-Events System (shocks, scandals, gov crises, elections)
-Awards System (MVPs, All-Industry teams, champions UI)
-Hall of Fame / Historical Records System
+
+Events System (shocks, scandals, crises, elections)
+
+Awards System (MVPs, All-Industry teams, championships UI)
+
+Hall of Fame / Historical Records
+
 Save/Load Worlds + import/export formats
 
-==================================================
 3. LONG-TERM VISION (TOP-LEVEL THEMES)
-==================================================
 
-Rarely changed—these guide all ticket design.
+(Stable; not modified.)
 
-A full BBGM-style competitive world where countries compete yearly
+A BBGM-style competitive world with yearly national standings
+
 Deep industry hierarchies modeled like sports leagues
-Deterministic stats driving corporate + national performance
-Generational life simulation (potential, peak age, decline)
-History, dynasties, eras; a living world timeline
-Addictive optimization loop: Sim → Analyze → Improve → Dominate
 
-==================================================
+Deterministic stats driving corporate + national outcomes
+
+Generational life simulation (potential → peak → decline)
+
+History, eras, dynasties — a persistent living timeline
+
+Addictive loop: Sim → Analyze → Improve → Dominate
+
 4. COMPLETED TICKETS
-==================================================
 
-Append new items here as brief bullets.
-Older entries remain permanently.
+(Append-only.)
 
-11. Education impact modeling v1
+Education Impact Modeling v1
+University Admission Controls (Player Country)
 
-12. University admission controls for the player country
-    (Player admissions override sim logic, UI controls, eligibility hints,
-     PlayerUniversityDecision model, backend POST/GET, sim-time overrides)
+UI controls, eligibility hints, PlayerUniversityDecision model, backend GET/POST, sim-time overrides.
 
-13. PersonYearPerformance model (per-person yearly contributions)
-    (Prisma model, sim integration, per-person yearly scores, reset/seed fixes)
+PersonYearPerformance Model
 
-Example: Per-Country Industry Dashboard
-Example: World Standings (company + country scores)
-Example: CountryYearPerformance pipeline (champions, ranking)
-Example: Company Performance page (benchmarks, peers, charts)
-Example: Player-Country Dashboard (/player)
+Prisma model, sim integration, per-person yearly scoring pipeline.
 
-==================================================
-5. NOTES
-==================================================
+UI Layout Shell v1
 
-Section (1) should ALWAYS reflect the exact next tickets your workflow will use.
+Global layout (sidebar + top nav), GameLayout wrapper, globals.css cleanup.
 
-When a ticket is completed:
-Append a tiny summary to README.md (Recent Additions)
-Append a dev-facing note to Developer Onboarding (Dev Changelog)
-Move the ticket from Section (1) → Section (4)
-LLM proposes a new ticket to add into Section (1)
+Player Dashboard UI v2
 
-Do not rewrite Sections (2), (3), or (4).
+Three-column dashboard: mini-standings, country stats, government summary, headlines, youth preview.
 
-This file is stable and append-only except for Section (1).
+5. WORKFLOW NOTES
+
+Section 1 must always show the exact next active tickets the LLM will operate on.
+
+When completing a ticket:
+
+Append to README.md → Recent Additions
+
+Append to DEVELOPER_ONBOARDING.md → Dev Changelog
+
+Move the ticket from Section 1 → Section 4
+
+LLM proposes and inserts a new ticket to keep Section 1 populated
+
+Sections 2, 3, and 4 are append-only and never rewritten.

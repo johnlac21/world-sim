@@ -2557,3 +2557,43 @@ If you follow this document, you should be able to build new features confidentl
 - Updated `/api/world/reset` and `scripts/seedWorld.ts` to safely delete PersonYearPerformance rows before deleting people/companies/world (prevents FK errors).
 - Verified end-to-end pipeline: schema → migration → reset → tick → new rows generated for each occupied CompanyPosition.
 - No UI yet; this lays the foundation for leaderboards, awards, and detailed person career/history pages.
+
+UI Layout Shell (Ticket 23)
+
+Added src/components/layout/GameLayout.tsx, implementing top nav, sidebar, and page wrapper.
+
+Updated src/app/layout.tsx to wrap all pages with GameLayout.
+
+Updated globals.css to align with UI Vision (light background, reduced Arial override).
+
+All pages now render inside a stable BBGM-style frame.
+
+Player Dashboard UI v2 (Ticket 24)
+
+Rebuilt /player/page.tsx into a three-column dashboard layout.
+
+Added mini-standings loader, youth quick-view integration, government card embedding, and headlines generation.
+
+/player now relies on /api/player-country, /api/world/[id]/standings, and /api/player/youth.
+
+Introduced a safer OverviewStat helper to avoid NaN rendering.
+
+Updated GovernmentCard list rendering to use unique keys.
+
+#### Ticket 24 – First UI refactor pass (world / country / people / leaders)
+
+- Converted several legacy pages to the new sidebar layout and card-based UI:
+  - `/` world overview now uses the left nav + top world header (year, actions) and pulls world summary + sample people from `/api/world`.
+  - `/person/[id]` consumes a richer payload (including `personalityArchetype`, `personalitySubtype`, and a full `stats` block) and renders grouped attribute sections plus structured career/education/relationships.
+  - `/country/[id]/industry` now expects an `industries: IndustryBlock[]` payload with `aggregate` + `companies` per industry, and renders industry “tabs” + company cards with hierarchy slots + performance snippet.
+  - `/player/youth` now uses `PlayerYouthResponse` with admissions metadata, tracks selected person IDs client-side, and POSTs `{ personIds: number[] }` to `/api/player/youth` to save university admissions.
+  - `/leaders` and `/office/[id]` now share a consistent layout and link through to office pages and person profiles; office term history expects `terms: OfficeTerm[]` with `personId` + `personName`.
+- Added reusable UI components:
+  - `CompanyHierarchySidebar` (`companyId` prop) hits `/api/company/[id]/hierarchy` and renders a scrollable hierarchy list; used on company detail pages to show leadership ladders.
+  - `TalentSearchModal` encapsulates the people search UI and calls `/api/people/search` with querystring filters (worldId, countryId, age range, employmentStatus, minIntelligence, minLeadership, industry). Supports pagination and an optional `onSelectPerson` callback for integrating into company/office assignment flows.
+- Fetch pattern for these pages:
+  - All refactored pages are client components that use `useEffect` + `fetch` with explicit `loading` and `error` state and basic cancellation flags (`cancelled` boolean) to avoid setting state after unmount.
+  - API handlers must return `{ error: string }` on failure; UI checks `res.ok` and `json.error` and surfaces a simple error message instead of crashing.
+- When extending the UI:
+  - Prefer adding new views as client components that follow this fetch pattern and use the existing layout primitives (sidebar nav, headers, cards, tables).
+  - Reuse `TalentSearchModal` and `CompanyHierarchySidebar` instead of rebuilding ad-hoc talent/hierarchy UIs; if the API shape changes, update these components in one place.

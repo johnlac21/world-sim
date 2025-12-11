@@ -66,9 +66,7 @@ export function TalentSearchModal({
   onSelectPerson,
   selectLabel = 'Select',
 }: TalentSearchModalProps) {
-  const [countryId, setCountryId] = useState<number | ''>(
-    defaultCountryId ?? '',
-  );
+  const [countryId, setCountryId] = useState<number | ''>(defaultCountryId ?? '');
   const [minAge, setMinAge] = useState<string>('20');
   const [maxAge, setMaxAge] = useState<string>('60');
   const [employmentStatus, setEmploymentStatus] = useState<string>('ANY');
@@ -81,7 +79,7 @@ export function TalentSearchModal({
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Reset filters when opening
+  // Reset page + error on open
   useEffect(() => {
     if (isOpen) {
       setPage(1);
@@ -91,6 +89,7 @@ export function TalentSearchModal({
 
   const fetchPage = async (nextPage: number) => {
     if (!isOpen) return;
+
     setLoading(true);
     setError(null);
 
@@ -103,23 +102,13 @@ export function TalentSearchModal({
       if (countryId !== '') params.set('countryId', String(countryId));
       if (minAge.trim() !== '') params.set('minAge', minAge.trim());
       if (maxAge.trim() !== '') params.set('maxAge', maxAge.trim());
-      if (employmentStatus !== 'ANY')
-        params.set('employmentStatus', employmentStatus);
-
-      if (minIntel.trim() !== '') {
-        params.set('minIntelligence', minIntel.trim());
-      }
-      if (minLead.trim() !== '') {
-        params.set('minLeadership', minLead.trim());
-      }
-      if (industry && industry !== '') {
-        params.set('industry', industry);
-      }
+      if (employmentStatus !== 'ANY') params.set('employmentStatus', employmentStatus);
+      if (minIntel.trim() !== '') params.set('minIntelligence', minIntel.trim());
+      if (minLead.trim() !== '') params.set('minLeadership', minLead.trim());
+      if (industry) params.set('industry', industry);
 
       const res = await fetch(`/api/people/search?${params.toString()}`);
-      const json = (await res.json()) as PeopleSearchResponse & {
-        error?: string;
-      };
+      const json = (await res.json()) as PeopleSearchResponse & { error?: string };
 
       if (!res.ok || (json as any).error) {
         throw new Error((json as any).error || 'Failed to load people');
@@ -130,6 +119,7 @@ export function TalentSearchModal({
     } catch (err: any) {
       console.error(err);
       setError(err?.message ?? 'Failed to load people');
+      setData(null);
     } finally {
       setLoading(false);
     }
@@ -158,7 +148,7 @@ export function TalentSearchModal({
           </button>
         </div>
 
-        {/* Content */}
+        {/* Body */}
         <div className="flex-1 flex overflow-hidden">
           {/* Filters */}
           <aside className="w-64 border-r p-3 space-y-3 bg-gray-50">
@@ -289,8 +279,7 @@ export function TalentSearchModal({
               <>
                 <div className="flex items-center justify-between mb-2 text-xs text-gray-600">
                   <span>
-                    {data.total} results · Page {data.page} of{' '}
-                    {data.totalPages}
+                    {data.total} results · Page {data.page} of {data.totalPages}
                   </span>
                   <div className="space-x-1">
                     <button

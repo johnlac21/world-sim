@@ -105,7 +105,8 @@ export function GameLayout({ children }: Props) {
     try {
       setSimLoading(true);
       await fetch("/api/sim/year", { method: "POST" });
-      router.refresh();
+      // Force a full reload so every page re-runs its useEffect fetches
+      window.location.reload();
     } finally {
       setSimLoading(false);
     }
@@ -120,11 +121,13 @@ export function GameLayout({ children }: Props) {
     try {
       setResetLoading(true);
       await fetch("/api/world/reset", { method: "POST" });
-      router.refresh();
+      // Same idea: full reload so all data is fresh
+      window.location.reload();
     } finally {
       setResetLoading(false);
     }
   };
+
 
   return (
     <div className="min-h-screen bg-[#f2f2f2] text-[#222222]">
