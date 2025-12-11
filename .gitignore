@@ -48,5 +48,4 @@ dev.db
 dev.db-journal
 .next/
 
-development_onboarding.txt
 prisma/dev.db

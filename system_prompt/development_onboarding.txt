@@ -1,0 +1,2559 @@
+DEVELOPER ONBOARDING — WORLD SIM BBGM
+
+VERSION: 1.0
+GOAL: Get a new developer fully oriented to the codebase, architecture, simulation model, and design vision for World Sim BBGM so they can safely extend the project without breaking core systems.
+
+WHAT THIS PROJECT IS
+
+World Sim BBGM is a browser-based management sim inspired by Basketball GM (BBGM), but applied to a world of people, countries, industries, and governments.
+
+Instead of managing a sports team, the player manages ONE COUNTRY. They are responsible for assigning talent to roles, watching people develop, and competing against other countries in a yearly “season” based on:
+
+Industry output
+
+Government performance
+
+Population well-being
+
+The simulation runs year by year, and over time it builds up:
+
+A history of country performance
+
+Champions each year
+
+Visible trends (up/down/same)
+
+The foundations for dynasties
+
+Current codebase features
+
+Right now, the codebase is a working world simulator prototype with:
+
+A seeded world:
+
+1 world
+
+5 countries
+
+~2,000 people
+
+Multiple companies per country, assigned to industries
+
+A yearly simulation loop:
+
+Aging, births, deaths
+
+Education (primary, secondary, university)
+
+Jobs (employment, promotions, terminations)
+
+Basic government offices and terms
+
+Structured industry hierarchies (IndustryRole + CompanyPosition)
+
+Yearly company performance (CompanyYearPerformance)
+
+Yearly country performance (CountryYearPerformance), including:
+
+companyScore (sum of company output)
+
+governmentScore (now v1 implemented; see below)
+
+populationScore (still placeholder)
+
+totalScore and an isChampion flag for each year’s top country
+
+A simple but growing world browser UI:
+
+Home (world overview)
+
+Player country dashboard (/player) with:
+
+Country overview (population, employment, etc.)
+
+Country performance summary
+
+Government overview card showing:
+
+Key high-prestige country-level offices
+
+Current office holders
+
+A 0–100 fit score per officeholder
+
+Term remaining in years
+
+Manual cabinet appointment overrides via a “Reassign” action per office, which opens a modal to select a new holder from a filtered candidate list. These reassignments create player-locked terms that auto elections will not override.
+
+A “Talent & Scouting” panel with an “Open Talent Search” button that opens a global TalentSearchModal. This modal lets the player search the world’s population (scoped by worldId and defaultCountryId) by age, stats, and industry experience to find promising candidates for offices and company roles. For now, selecting a person from the search opens their /person/[id] page in a new tab.
+
+A Youth Pipeline entry point that links to a dedicated /player/youth page. This page lists teenage and early-20s prospects in the controlled country, with columns for age, potentialOverall, current education level, and a computed “Prospect grade” (0–100 score + letter grade) derived from potential and key stats. It is sorted by potentialOverall by default, concretely surfacing the controlled country’s “youth pool / talent pipeline.”
+
+Country pages (/country/[id]) showing:
+
+Political offices and term history
+
+Current-year performance summary
+
+Country history panel with multi-year totalScore + rank + champion markers
+
+Country industry pages (/country/[id]/industry)
+
+Person pages (/person/[id])
+
+Leaders (/leaders)
+
+Office pages (/office/[id])
+
+Company pages (/company/[id]) with:
+
+Hierarchy sidebar (roles to people)
+
+Per-company performance breakdown (current year, benchmark, peers, history)
+
+For companies in the controlled country, a BBGM-style “lineup/depth chart” editor in the sidebar that lets the player:
+
+Manually reassign which employee occupies each CompanyPosition role via a dropdown-based editor.
+
+Mark a CompanyPosition as locked so that yearly promotion/hiring logic respects that slot and does not auto-promote out of it.
+
+World standings (/world/[id]/standings) that:
+
+Use CountryYearPerformance instead of recomputing on the fly
+
+Show current rank, last year’s rank, and a simple trend arrow
+
+Integrate world-level top companies and industry summaries
+
+Industry system (first pass)
+
+We currently have a first-pass industry system:
+
+Companies tagged with a flexible industry string (e.g. "TECH", "FINANCE", "RESEARCH").
+
+Global industry hierarchies defined via IndustryRole (roles per industry with ranks).
+
+Per-company role assignments (CompanyPosition) seeded at world reset.
+
+A yearly maintenance logic that:
+
+Cleans up invalid positions
+
+Promotes strong employees
+
+Hires new employees for lowest-tier roles
+
+Respects player-locked CompanyPosition slots by:
+
+Preferring locked positions when deduplicating conflicting slots for the same (company, role).
+
+Never using locked slots as promotion “sources” when filling higher roles.
+
+Leaving locked occupants in place unless they become invalid (death, employment change, etc.).
+
+Performance + standings system
+
+On top of that, there is a v1 performance system:
+
+CompanyYearPerformance:
+
+Derived from role occupants and their stats
+
+Talent, leadership, reliability, composite outputScore
+
+CountryYearPerformance:
+
+Aggregates companyScore across all companies in a country
+
+Previously had placeholders for governmentScore and populationScore;
+
+governmentScore is now implemented (v1) as a 0–100 score based on:
+
+Who holds each country-level office
+
+Office prestige
+
+The leader’s leadership, judgment, integrity, and charisma
+
+Normalized and folded into totalScore via a configurable weight
+
+populationScore remains a placeholder (for future demographic systems)
+
+Computes totalScore from:
+
+companyScore
+
+Weighted governmentScore
+
+populationScore (currently 0)
+
+Marks isChampion = true for the best country each year.
+
+These tables feed:
+
+/company/[id] performance panels and history
+
+/world/[id]/standings league table with recent history and rank changes
+
+/country/[id] “history” panel for the country
+
+/player country dashboard performance snippet
+
+Long-term vision
+
+The long-term vision is to evolve this into a BBGM-style hierarchy + stats game:
+
+Structured industries (like “teams”) with fixed roles per company
+
+A government hierarchy that acts as the premier competitive layer per country
+
+Deterministic stats that produce visible performance metrics
+
+A yearly competitive loop with:
+
+Rankings
+
+Awards
+
+Champions and dynasties
+
+Country history pages with eras (good/bad) tied to leaders and institutions
+
+In addition, the company hierarchy editor for the controlled country should eventually feel like BBGM’s “set your lineup / depth chart”:
+
+The player selects which employees sit in which roles (President, VP, Manager, etc.).
+
+Locked company slots are analogous to “don’t let the AI change this line.”
+
+The yearly sim still fills vacancies and promotes/hire around those locked decisions.
+
+The youth pipeline features are intended to mirror BBGM’s prospect lists: the /player/youth view gives a sortable, grade-driven table of teenage and early-20s NPCs in the controlled country so the player can monitor and eventually funnel high-potential youth into key company and government roles.
+
+TECHNOLOGY STACK & HIGH-LEVEL ARCHITECTURE
+
+Frontend
+
+Next.js App Router (all routes under src/app/*)
+
+React client components for all UI pages
+
+Current pages:
+
+/ — Home / World overview
+
+/player — Controlled Country dashboard
+
+Fetches from /api/player-country
+
+Shows:
+
+Country basics (population, companies, employed/unemployed…)
+
+Country performance summary (from CountryYearPerformance)
+
+Government overview card (high-level offices + fit scores + term remaining)
+
+Per-office “Reassign” actions that open a modal to manually appoint a new officeholder from eligible candidates.
+
+A “Talent & Scouting” card that describes the global talent search functionality and exposes an “Open Talent Search” button. Clicking this opens the TalentSearchModal, which uses worldId and countryId from /api/player-country to scope search results. The modal lets the player filter candidates by age, stats, and industry experience across the world (with a default focus on their own country), and currently routes selection to /person/[id] via a “View profile” action.
+
+/player/youth — Youth Pipeline / prospects view for the controlled country
+
+Fetches from /api/player/youth
+
+Shows:
+
+Configuration summary (youthMinAge–youthMaxAge) for the current world.
+
+A table of teenage and early-20s NPCs in the controlled country (e.g., ages 15–23) who are alive and in that age band.
+
+Columns for: Name (linked to /person/[id]), Age, potentialOverall, current educationLabel (derived from active Enrollment/School.level or “Out of school” / “Not in school”), and a Prospect Grade (letter grade + 0–100 prospectScore).
+
+Prospects are pre-sorted server-side by potentialOverall desc, then prospectScore desc, then age asc, emulating a BBGM-style “top prospects list” for the nation’s youth/talent pipeline.
+
+The page includes simple navigation back to /player and copy explaining that this table represents the country’s youth pipeline and is a key scouting surface for future leaders and executives.
+
+/country/[id] — Country political history + performance summary + history panel
+
+/country/[id]/industry — Per-country industry structure dashboard
+
+/person/[id] — Person detail view
+
+/leaders — Global leaders / offices view
+
+/office/[id] — Single office history
+
+/company/[id] — Company page:
+
+Company header (name, industry, country)
+
+Left/main column:
+
+Company performance panels:
+
+Current year breakdown
+
+Industry benchmark
+
+Industry peers
+
+Multi-year performance history (bar chart/table)
+
+Right sidebar:
+
+Full hierarchy ladder (roles → people)
+
+For companies in the controlled country, an edit mode that:
+
+Shows a “Manage lineup / hierarchy” toggle when the company’s countryId matches World.controlledCountryId.
+
+Allows the player to:
+
+Click into a role and choose a different eligible employee from a dropdown (backed by a player-specific candidates API).
+
+Clear a slot to mark it as vacant (auto-filled next sim year).
+
+Toggle a “locked” state on the slot so yearly promotions/hiring will respect the occupant.
+
+Uses the same IndustryRole ladder but gives the player direct control, similar to BBGM’s depth chart screen.
+
+/world/[id]/standings — National standings view:
+
+Uses /api/world/[id]/standings (CountryYearPerformance aggregates)
+
+Uses /api/world/[id]/top-companies (top companies for current year)
+
+Backend
+
+Next.js route handlers under src/app/api/*
+
+Simulation logic in src/lib/sim.ts
+
+Stat generation and growth in src/lib/stats.ts
+
+Personality system in src/lib/personality.ts
+
+Performance aggregation utilities in src/lib/performance.ts:
+
+Company-level summaries per country
+
+Country-level histories from CountryYearPerformance
+
+Government utilities (v1):
+
+Government scoring integrated into computeCountryYearPerformance in sim.ts
+
+Helper logic for office-based “leader rating” and normalization
+
+Player government control utilities:
+
+New API routes under /api/player/offices/[officeId]/… for manual cabinet overrides:
+
+GET /api/player/offices/[officeId]/candidates — fetch eligible candidates for that office in the controlled country.
+
+POST /api/player/offices/[officeId]/appoint — end the current term, create a new term for the chosen candidate, and mark it as playerLocked so auto elections do not override it.
+
+Player company hierarchy control utilities:
+
+New API routes under /api/player/companies/[companyId]/positions/[roleId]/… for controlled-country companies:
+
+GET /api/player/companies/[companyId]/positions/[roleId]/candidates
+
+Returns eligible employees of that company who can occupy the specified role, plus metadata (basic stats, current role).
+
+POST /api/player/companies/[companyId]/positions/[roleId]/assign
+
+Assigns the chosen person to that role for that company.
+
+Clears or moves any existing occupant so that at most one CompanyPosition exists per (companyId, roleId).
+
+Respects the locked flag: when assigning from the UI, you can also set the slot as locked (so the yearly sim won’t promote out of it).
+
+These APIs are only active for companies whose countryId matches World.controlledCountryId and are used by the /company/[id] “Manage lineup” sidebar UI.
+
+Global talent search utilities:
+
+The TalentSearchModal component (used on /player) integrates with server-side search APIs (e.g., a talent-search route) to:
+
+Query people in a given world (worldId) with optional filters for:
+
+Country (defaultCountryId from /api/player-country)
+
+Age ranges
+
+Stat thresholds (e.g., leadership, intelligence, charisma)
+
+Industry experience (via CompanyPosition or Employment history)
+
+Return a list of candidates with summary info that is useful for both office and company-role scouting.
+
+Selection currently triggers onSelectPerson, which navigates to /person/[id] (view-only scouting), but the same search infrastructure is intended to support future “Send to office/company role” flows.
+
+Youth pipeline utilities:
+
+A dedicated youth-prospects endpoint and helper logic back the /player/youth page:
+
+/api/player/youth — youth pipeline API
+
+Resolves the single world and its controlledCountryId (same pattern as /api/player-country).
+
+Queries Person where worldId = current world, countryId = controlledCountryId, isAlive = true, and age is between YOUTH_MIN_AGE and YOUTH_MAX_AGE (currently ~15–23).
+
+Includes active Enrollment + School for each youth (endYear = null) to derive current educationLevel/educationLabel.
+
+Uses a helper in src/lib/prospects.ts (computeProspectScoreAndGrade) to compute:
+
+prospectScore (0–100 numeric score)
+
+prospectGrade (A/B/C/D letter)
+
+Sorts results server-side by potentialOverall DESC, then prospectScore DESC, then age ASC, and returns them along with youthMinAge/youthMaxAge and worldId/countryId.
+
+src/lib/prospects.ts
+
+Defines a small, pure helper that takes a subset of Person stats (potentialOverall, intelligence, creativity, discipline, leadership, charisma, ambition, stability) and produces a weighted prospectScore (0–100) plus a letter grade.
+
+Weights are chosen to heavily prioritize potentialOverall while incorporating cognitive, leadership, and personality blocks.
+
+This helper is intended to be reusable later (e.g., for scouting reports, UI badges, or “Top Prospects” widgets on /player).
+
+World seeding/reset logic
+
+scripts/seedWorld.ts (CLI script)
+
+/ api/world/reset route (mirrors seedWorld logic inside the app)
+
+Database
+
+Prisma ORM + SQLite
+
+Schema in prisma/schema.prisma
+
+Core loop:
+
+Seed world (via /api/world/reset or scripts/seedWorld.ts)
+
+Simulate 1 year at a time (via /api/sim/year, calls into src/lib/sim.ts)
+
+Each sim year:
+
+Updates people, jobs, education, relationships, government
+
+Maintains company hierarchies
+
+Computes and persists CompanyYearPerformance for each company
+
+Aggregates to CountryYearPerformance for each country, including:
+
+companyScore
+
+governmentScore (v1)
+
+populationScore (placeholder)
+
+totalScore, isChampion
+
+Browse world and history via the UI
+
+Design constraint:
+Do not invent a new architecture or file layout unless explicitly requested. All new features should integrate cleanly into this structure.
+
+DOMAINS & CORE DATA MODEL
+
+Below is a conceptual overview of the key Prisma models (exact fields in schema.prisma).
+
+World
+
+Represents the entire simulation universe.
+
+id, name, currentYear
+
+countries: Country[]
+
+people: Person[]
+
+companies: Company[]
+
+schools: School[]
+
+offices: Office[]
+
+controlledCountryId: which country the player controls
+
+companyPerformances: CompanyYearPerformance[]
+
+countryPerformances: CountryYearPerformance[]
+
+Country
+
+Represents a single nation.
+
+Belongs to a World (worldId)
+
+Relationships:
+
+people
+
+companies
+
+schools
+
+offices (includes president + cabinet)
+
+performances: CountryYearPerformance[] — yearly country summary (totalScore, champion, etc.)
+
+May be linked back as the controlled country via World.controlledCountryId
+
+Person
+
+NPCs that make up the population.
+
+Demographics:
+
+worldId, countryId?
+
+name, birthYear, age
+
+isAlive, isPlayer
+
+Stats:
+
+Cognitive (intelligence, memory, creativity, discipline, judgment, adaptability)
+
+Social/influence (charisma, leadership, empathy, communication, confidence, negotiation)
+
+Physical (strength, endurance, athleticism, vitality, reflexes, appearance)
+
+Personality stats:
+
+ambition, integrity, riskTaking, patience, agreeableness, stability
+
+Potential & development:
+
+potentialOverall
+
+peakAge
+
+developmentStyle (e.g. "EARLY", "NORMAL", "LATE", "VOLATILE")
+
+Personality system:
+
+personalityArchetype
+
+personalitySubtype
+
+Family:
+
+parent1Id, parent2Id
+
+childrenAsParent1, childrenAsParent2
+
+marriagesA, marriagesB
+
+Social:
+
+friendshipsA, friendshipsB
+
+Career & education:
+
+employments
+
+enrollments
+
+Politics:
+
+terms (offices held over time)
+
+prestige numeric score
+
+Industry hierarchy:
+
+companyPositions (links to CompanyPosition slots)
+
+Company
+
+Represents a business entity.
+
+name
+
+industry: String (e.g. "TECH", "FINANCE", "RESEARCH"; kept as string, not enum)
+
+worldId, countryId
+
+Relationships:
+
+employments (job history)
+
+positions: CompanyPosition[] (structured hierarchy slots)
+
+performances: CompanyYearPerformance[] (yearly performance rows)
+
+Conceptually:
+
+Acts as both generic employer (Employment)
+
+And structured BBGM-style “team” (IndustryRole + CompanyPosition)
+
+Employment
+
+Tracks jobs and career history.
+
+personId, companyId
+
+title (job title)
+
+salary
+
+startYear, endYear?
+
+School
+
+Educational institutions.
+
+name
+
+level: "Primary" | "Secondary" | "University" (stored as string)
+
+prestige (1–100)
+
+worldId, countryId
+
+enrollments: Enrollment[]
+
+Enrollment
+
+Tracks schooling.
+
+personId, schoolId
+
+startYear
+
+endYear?
+
+Marriage
+
+Tracks marriages between people.
+
+personAId, personBId
+
+startYear
+
+endYear? (for divorce)
+
+Friendship
+
+Tracks social relationships.
+
+personAId, personBId
+
+strength (1–100)
+
+Office
+
+Political/leadership offices.
+
+Examples:
+
+World level:
+
+World President
+
+Country level:
+
+President of Alboria, etc.
+
+Cabinet-level per country:
+
+Minister of Economy
+
+Minister of Education
+
+Minister of Industry
+
+Minister of Health
+
+Minister of Infrastructure
+
+Fields:
+
+name
+
+level: "World" | "Country" | "Cabinet" (string)
+
+termLength (years)
+
+prestige (1–100)
+
+worldId
+
+countryId?
+
+terms: Term[]
+
+These offices form the government hierarchy that:
+
+Powers office history and leaders pages
+
+Now directly feeds into governmentScore in CountryYearPerformance via per-office leader ratings and office prestige weighting
+
+Term
+
+Tracks which person held which office and when.
+
+officeId
+
+personId
+
+startYear
+
+endYear?
+
+playerLocked: Boolean (default false) — if true, this term represents a manual player appointment and auto elections will not override it while active.
+
+Used for:
+
+Office history pages
+
+Country political history
+
+Linking good/bad eras to specific leaders
+
+Determining the “current holder” used in:
+
+Government overview card on /player
+
+Government scoring function (v1) for CountryYearPerformance
+
+Flagging player-controlled cabinet appointments that should be respected by the yearly election logic.
+
+IndustryRole
+
+Global definition of a role within an industry hierarchy.
+
+industry: string (e.g. "TECH", "FINANCE", "RESEARCH")
+
+name: string (e.g. "President", "Vice President", "Manager")
+
+rank: number (0 = top, higher is lower tier)
+
+positions: CompanyPosition[] (slots that use this role)
+
+These are templates; they are reused across all companies of a given industry.
+
+CompanyPosition
+
+Connects a person to a company in a specific IndustryRole.
+Think of it as a BBGM “depth chart slot”.
+
+companyId → Company
+
+personId → Person
+
+roleId → IndustryRole
+
+startYear
+
+endYear?
+
+locked: Boolean (default false)
+
+Semantics:
+
+Maintained yearly by sim.ts. This is the core structural representation of who is where in the industry ladder.
+
+If locked = true:
+
+Yearly promotion logic will not use this slot as a source for promotion to another role.
+
+Validation/deduplication prefers to keep locked positions when two occupants conflict for the same (companyId, roleId).
+
+The player can explicitly toggle this via the /company/[id] “Manage lineup” editor for companies in the controlled country, emulating “do not change this line/position.”
+
+CompanyYearPerformance
+
+Yearly performance for a company.
+
+Fields:
+
+worldId
+
+companyId
+
+year
+
+talentScore
+
+leadershipScore
+
+reliabilityScore
+
+outputScore
+
+createdAt
+
+Unique on (companyId, year).
+
+Computation:
+
+Deterministic formula based on:
+
+People in CompanyPosition roles
+
+Their stats
+
+Role rank weightings
+
+Consumption:
+
+/api/world/[id]/standings (aggregated to countries)
+
+/api/world/[id]/top-companies
+
+/api/company/[id]/hierarchy
+
+/company/[id] UI panels (current year, benchmark, peers, history)
+
+CountryYearPerformance
+
+Yearly performance for a country.
+
+Fields:
+
+worldId
+
+countryId
+
+year
+
+companyScore: Float (sum of company output in that country)
+
+governmentScore: Float
+
+Now v1 implemented:
+
+Computed from country-level offices for that year
+
+For each office:
+
+Find active term (where endYear is null)
+
+Compute a 0–100 “leader rating” from:
+
+leadership, judgment, integrity, charisma
+
+Weight by office prestige
+
+Normalize across all offices to a global 0–100 score
+
+populationScore: Float (placeholder for future demographics)
+
+totalScore: Float
+
+Computed as:
+
+companyScore
+
+GOVERNMENT_SCORE_WEIGHT * governmentScore
+
+populationScore (currently 0)
+
+isChampion: Boolean (true if country is champion for that world-year)
+
+Unique on (worldId, countryId, year)
+Indexed on (worldId, year)
+
+This is the season summary for a country.
+
+Used for:
+
+/world/[id]/standings:
+
+Current standings
+
+Last year comparison
+
+5-year history
+
+Champion markers
+
+/country/[id]:
+
+Performance summary
+
+History panel + sparkline chart
+
+/player:
+
+Controlled country performance snippet
+
+Future:
+
+Dynasties
+
+Awards
+
+Hall of Fame
+
+Together, these models enable a generational simulation with:
+
+Births, deaths, aging
+
+Education, jobs, relationships, politics
+
+Structured industry + government hierarchies
+
+Per-company and per-country performance over time
+
+PLAYER MODEL & GAME FANTASY
+
+Important: The “player” is not a person.
+The “player” is the country referenced by World.controlledCountryId.
+
+/player page is the controlled country dashboard—analogous to a team page in BBGM.
+
+All gameplay (role assignment, optimization, long-term planning) is built around:
+
+This one controlled country
+
+Its companies, government, and talent pipeline
+
+Core fantasy:
+
+“Manage your country’s elite talent and institutions over decades. Assign people to roles in industry and government, watch them develop, and compete with other countries in a yearly BBGM-style season. Track your country’s rise or fall through champions, standings, and history.”
+
+Key structures:
+
+Industry hierarchy (IndustryRole + CompanyPosition):
+
+Determines company output
+
+For the controlled country, the player can:
+
+Open a company page and manually edit which person occupies each role in that company’s hierarchy.
+
+Lock specific slots to keep the sim from auto-promoting/hiring out of those positions.
+
+Let the yearly sim still auto-fill vacancies and promote in unlocked slots around their decisions.
+
+Government hierarchy (Office + Term):
+
+Drives governmentScore via officeholders’ stats and office prestige
+
+Surfaces in the /player Government card as:
+
+Visible “cabinet” (top offices)
+
+Fit scores and term remaining
+
+Direct player levers via manual “Reassign” actions that let the player override auto elections and install their preferred ministers, creating playerLocked terms.
+
+CountryYearPerformance:
+
+Rolls everything up into a single season outcome
+
+Determines champions and rank trends
+
+The youth pipeline (Player → /player/youth):
+
+Treats teenagers and early-20s NPCs in the controlled country as “prospects.”
+
+Provides a BBGM-style prospects table sorted by potential and a composite prospectScore, with education status and quick links to /person/[id].
+
+Acts as the main surface where the player can monitor the country’s future elite and decide who to eventually steer into key company and government roles.
+
+SIMULATION PIPELINE (RESET & YEARLY SIM)
+
+4.1 Reset / Seeding
+
+Two entry points:
+
+scripts/seedWorld.ts: CLI script for local dev
+
+/api/world/reset: Next.js route used by the UI
+
+Both:
+
+Wipe all existing data in safe dependency order:
+
+Friendships, marriages
+
+Enrollments, employments
+
+CompanyPosition
+
+CompanyYearPerformance
+
+CountryYearPerformance
+
+Terms
+
+Schools
+
+Companies
+
+Offices
+
+People
+
+Countries
+
+Worlds
+
+IndustryRole
+
+Create a new world with:
+
+currentYear = 0
+
+Controlled country set to the first country
+
+Create 5 countries
+
+Seed ~2,000 people with:
+
+Age range (0–60)
+
+Full stat profiles
+
+Potential & development style
+
+Personality archetype/subtype
+
+Seed schools per country:
+
+2 Primary
+
+2 Secondary
+
+1 University
+
+Seed companies:
+
+3–6 per country
+
+Assigned industries (TECH, FINANCE, RESEARCH) via rotation
+
+Seed industry role templates:
+
+For each industry:
+
+Ranks 0–9: President, Vice President, Senior Manager, Manager, Associate Manager, Lead Analyst, Analyst, Junior Analyst, Trainee, Worker
+
+Seed jobs:
+
+Working-age NPCs have a chance of employment
+
+Player-person (if present) always gets a job
+
+Seed CompanyPosition:
+
+For each company, employees are assigned to industry roles using:
+
+Exec roles favor leadership, judgment, charisma, etc.
+
+Manager roles favor leadership, discipline, communication, etc.
+
+Contributor roles favor intelligence, discipline, adaptability, etc.
+
+All seeded CompanyPosition rows start as locked = false; only the player, via the company hierarchy UI or future tools, will mark slots as locked.
+
+Seed offices (world + country + cabinet):
+
+World:
+
+World President
+
+Country:
+
+President of <Country>
+
+Minister of Economy
+
+Minister of Education
+
+Minister of Industry
+
+Minister of Health
+
+Minister of Infrastructure
+
+Each office has level, termLength, prestige, and is wired to a world/country.
+
+Terms are initially minimal or empty; elections during simulation fill them.
+
+New manual appointments created later will set playerLocked = true on the Term; initial seeding leaves terms unlocked so the election system can populate them.
+
+As a developer:
+
+If you change the schema, you must update:
+
+prisma/schema.prisma
+
+scripts/seedWorld.ts
+
+/api/world/reset
+
+Reset should always leave you with a playable, consistent world in year 0:
+
+Companies have industries
+
+Industry roles exist
+
+Company positions exist
+
+Offices exist (president + cabinet)
+
+Performance tables are empty and ready to be populated as years advance
+
+4.2 Yearly Simulation
+
+Entry point:
+
+/api/sim/year → calls tickYear (in src/lib/sim.ts)
+
+At a high level, each year:
+
+Advance world year
+
+Update people (age, death, births, stats)
+
+Handle education
+
+Handle jobs
+
+Handle government offices / terms
+
+Maintain industry hierarchies
+
+Compute company performance (CompanyYearPerformance)
+
+Aggregate to country performance (CountryYearPerformance)
+
+Mark champion country for this year
+
+People
+
+age += 1 for all living people
+
+Death probability grows with age:
+
+Low for young people
+
+Higher for older
+
+On death:
+
+isAlive = false
+
+Close job, school, marriage where appropriate
+
+Births
+
+Adults in a certain age range (e.g. 20–40) have probabilistic births
+
+Child inherits tendencies from parents + noise
+
+New Person rows created with stats, potential, personality
+
+Stat development
+
+Stat change depends on:
+
+potentialOverall
+
+developmentStyle
+
+peakAge
+
+Stat type (physical peaks earlier, cognitive later)
+
+Behavior:
+
+Under 18: stronger growth
+
+Around peak: strong upward pull
+
+Post-peak: gentle decline, more for volatile dev styles
+
+Education
+
+Ages:
+
+6–11 → Primary
+
+12–17 → Secondary
+
+18–22 → potential University enrollment
+
+University enrollment chance:
+
+Based on (intelligence + discipline) and school prestige
+
+Enrollment entries are created and ended as people progress/age out.
+
+Jobs
+
+Working age approx. 18–65.
+
+Chance-based hiring into companies:
+
+Influenced by stats and education
+
+Employed people:
+
+May get raises
+
+May be promoted
+
+May retire or be fired
+
+Jobs end on:
+
+Retirement age
+
+Death
+
+Random events
+
+Government (offices & terms)
+
+For each office (World President, Presidents, Cabinet):
+
+Check for an active term and whether its termLength has expired.
+
+If there is no active term for that office, or the term has run its full length and is not playerLocked, the sim runs an “election”:
+
+Choose candidate pool based on:
+
+Age
+
+Country
+
+Minimal prestige constraints
+
+Use weighted lottery based on:
+
+charisma
+
+leadership
+
+Existing prestige
+
+Create a new Term with startYear, endYear (or endYear = null for ongoing), and playerLocked = false (auto-elected term).
+
+If the active term is playerLocked = true, the auto-election logic respects the player’s manual appointment and skips replacing this office until either the holder becomes invalid (death, country change, etc.) or a later manual/auto update explicitly ends the term.
+
+The system also applies small prestige boosts to winners.
+
+This sets up a history of leaders per office and now directly influences:
+
+governmentScore (v1) for each CountryYearPerformance row
+
+The /player Government card that shows current cabinet and fit scores
+
+Industry hierarchies (CompanyPosition)
+
+Each year:
+
+Clean up invalid positions:
+
+Person died
+
+Person not employed at that company
+
+Country mismatch
+
+Industry mismatch
+
+For each company:
+
+Get ordered IndustryRole ladder (rank 0 → 9)
+
+Promotions:
+
+Higher-tier vacancies attempt to promote best candidates from lower tiers.
+
+Role-specific scoring uses the same exec/manager/contributor functions as seeding.
+
+Locked slots are never used as promotion sources:
+
+If a CompanyPosition is locked, the sim will not move that person out to fill a higher role.
+
+This preserves player-made “lineup” decisions for controlled-country companies.
+
+Hiring:
+
+Lowest-tier vacancies pull from unemployed people in that country
+
+While candidates exist, assign them according to stats
+
+Validation & deduplication:
+
+If multiple CompanyPosition rows exist for the same (companyId, roleId), the validator:
+
+Discards rows whose role.industry doesn’t match company.industry.
+
+Prefers to keep any locked slot.
+
+If multiple candidates are eligible, keeps the highest-intelligence person.
+
+Net effect: the company’s internal hierarchy shifts over time as people die, get hired, promoted, etc., but for the controlled country:
+
+Player-locked slots act as anchors in the hierarchy, similar to a GM telling the AI not to change a specific starter.
+
+Company performance (CompanyYearPerformance)
+
+After hierarchies are stable:
+
+For each company:
+
+Load its CompanyPosition rows + persons + roles
+
+Compute:
+
+talentScore
+
+leadershipScore
+
+reliabilityScore
+
+Weighted by role rank (execs matter more)
+
+Combine into outputScore with a deterministic formula
+
+Upsert a CompanyYearPerformance row per (companyId, year)
+
+This gives per-company metrics for:
+
+/company/[id] page
+
+Industry benchmark/peers
+
+Top lists
+
+Year-over-year trend
+
+Country performance (CountryYearPerformance)
+
+Finally, we aggregate to country-level:
+
+For each country:
+
+Company component
+
+Sum company outputScore of that year into companyScore
+
+Government component (v1)
+
+Compute governmentScore from offices in that country:
+
+Consider country-level offices (level = "Country") tied to that country
+
+For each office:
+
+Find its active term (endYear === null)
+
+Take the holder’s stats:
+
+leadership, judgment, integrity, charisma
+
+Compute a “leader rating” (0–100)
+
+Weight by office prestige
+
+Normalize total weighted score by totalPrestige * 100 → final 0–100 governmentScore
+
+Apply GOVERNMENT_SCORE_WEIGHT to translate governmentScore into the same “scale” as companyScore and add it into totalScore.
+
+Population component (future)
+
+populationScore currently remains 0 (placeholder).
+
+Future: derived from health, education levels, employment, etc.
+
+Total score and champion
+
+Compute totalScore = companyScore + GOVERNMENT_SCORE_WEIGHT * governmentScore + populationScore
+
+Determine champion:
+
+Country with highest totalScore for that (worldId, year) gets isChampion = true
+
+Persist
+
+Remove any existing rows for that (worldId, year) and re-insert fresh CountryYearPerformance rows for all countries.
+
+This table powers:
+
+/world/[id]/standings:
+
+Ranks countries by totalScore for the current year
+
+Shows last year’s rank and trend arrow
+
+Pulls last ~5 years per country for mini history
+
+/country/[id]:
+
+Shows current-year performance summary
+
+Shows a “History” panel with:
+
+table or sparkline of totalScore over time
+
+champion highlights for relevant years
+
+/player:
+
+Can surface the controlled country’s current-year performance and ranking in future UI expansions.
+
+FRONTEND & API INTERACTION
+
+UI pages (App Router)
+
+/ — Home / world overview
+
+Uses /api/world for world summary
+
+Shows:
+
+World name
+
+Current year
+
+Basic stats (countries, people, companies)
+
+Buttons:
+
+Reset World (POST /api/world/reset)
+
+Sim 1 Year (POST /api/sim/year)
+
+/player — Controlled country dashboard
+
+Uses /api/player-country
+
+Shows:
+
+Country name, world name
+
+Population, companies, schools, employed/unemployed
+
+Government overview card:
+
+High-level, country-level offices (top N by prestige, e.g. 8)
+
+For each:
+
+Office name (linked to /office/[id])
+
+Current holder (linked to /person/[id], or “Vacant”)
+
+Fit score (0–100, derived from the same leadership/judgment/integrity/charisma mix used in government scoring)
+
+Term remaining in years (computed from termLength and startYear vs currentYear)
+
+Actions column with a “Reassign” button that opens a modal to manually appoint a new holder for that office.
+
+The modal:
+
+Calls GET /api/player/offices/[officeId]/candidates to fetch eligible candidates from the controlled country.
+
+Displays candidate name, age, fitScore, and whether they currently hold the office.
+
+On “Appoint”, calls POST /api/player/offices/[officeId]/appoint with { personId }.
+
+On success, the API ends the current term, creates a new Term with playerLocked = true, and the page reloads /api/player-country so the Government card updates.
+
+Country Performance panel:
+
+Summary of this year’s performance from CountryYearPerformance
+
+Uses getCountryPerformanceSummary from src/lib/performance.ts
+
+Links:
+
+/country/[controlledId]/industry
+
+/world/[worldId]/standings
+
+Talent & Scouting panel:
+
+A horizontal card that explains the global talent search system and contains an “Open Talent Search” button.
+
+The button is enabled when /api/player-country returns valid worldId and countryId for the controlled country.
+
+Clicking it opens the TalentSearchModal, which:
+
+Uses worldId to scope queries to the current world.
+
+Uses defaultCountryId (the controlled country) as a default filter.
+
+Lets the player filter NPCs by age, stats, and industry experience to scout for potential cabinet ministers or company executives.
+
+Currently exposes a “View profile” action that navigates to /person/[id] in a new tab, turning global search into a scouting tool layered on top of the existing person/company/government pages.
+
+Youth Pipeline link:
+
+The header nav on /player includes a “Youth Pipeline” button that links to /player/youth. This gives the player a quick way to jump between high-level country view (current season) and the underlying youth prospects that will shape future seasons.
+
+/player/youth — Youth Pipeline
+
+Uses /api/player/youth
+
+Shows:
+
+Header explaining the age band (e.g., 15–23) and that this view represents the controlled country’s youth pipeline.
+
+Navigation back to /player.
+
+Prospects table:
+
+Name (link to /person/[id])
+
+Age
+
+Potential Overall
+
+Education (primary/secondary/university/out-of-school/not-in-school)
+
+Prospect Grade (letter grade + numeric score, e.g., “A (92/100)”)
+
+Footer copy explaining that the grade is built from potential plus cognitive/leadership/personality stats and is meant as a scouting heuristic rather than a hard truth.
+
+/country/[id] — Country page
+
+Uses /api/country/[id]
+
+Shows:
+
+Country name, world name
+
+Political offices:
+
+President + cabinet offices (Economy, Education, Industry, Health, Infrastructure)
+
+For each:
+
+level, termLength, prestige
+
+Current holder (if any)
+
+List of past terms
+
+Country Performance Panel (current year):
+
+totalOutput, numCompanies, averageOutput
+
+Per-industry breakdown for this year:
+
+numCompanies, totalOutput, average
+
+Top companies (for this country, for the current year)
+
+Country History section:
+
+Pulls multiple CountryYearPerformance rows (e.g. last 10 years)
+
+Shows:
+
+year
+
+totalScore
+
+rank (derived from standings in that year or precomputed)
+
+isChampion highlight
+
+Visually encourages connecting:
+
+Good/bad eras
+
+Past leaders/terms in offices
+
+/country/[id]/industry — Country industry dashboard
+
+Uses /api/country/[id]/industry
+
+Shows:
+
+Per industry (TECH, FINANCE, RESEARCH):
+
+Companies in that country
+
+For each company:
+
+Hierarchy ladder (IndustryRole ordered by rank)
+
+Occupant name (or vacancy)
+
+Basic stat or performance indicator (optional)
+
+/person/[id] — Person page
+
+Uses /api/person/[id]
+
+Shows:
+
+Name, age, alive/dead
+
+Full stat profile
+
+Personality archetype/subtype
+
+Education history (Enrollments)
+
+Employment history (Employments → linked to company pages)
+
+Family links (parents/children)
+
+Marriages and friendships
+
+/leaders — World leaders
+
+Uses /api/offices/world (and/or filtered offices)
+
+Shows:
+
+World-level offices, plus potentially a quick summary of major country offices
+
+Current office holders
+
+/office/[id] — Single office history
+
+Uses /api/office/[id]
+
+Shows:
+
+Office name, level, prestige, term length
+
+Term history:
+
+For each term:
+
+Person name
+
+Start/end years
+
+Whether it was playerLocked (optional future UI)
+
+/company/[id] — Company page
+
+Uses /api/company/[id]/hierarchy
+
+Contains:
+
+Header:
+
+Company name, industry, country link
+
+Main column:
+
+Performance (Current Year) panel:
+
+Latest CompanyYearPerformance row
+
+outputScore + talent/leadership/reliability breakdown
+
+Link to /world/[worldId]/standings
+
+Industry Benchmark panel:
+
+This company’s output vs industry average
+
+Rank in this industry for this year
+
+Industry Peers panel:
+
+Ranked table of all companies in this industry + world in that year
+
+Highlights the current company
+
+Performance History panel:
+
+Recent years’ outputScores (e.g. up to 10 years)
+
+Visual bar chart + numeric values
+
+Right sidebar:
+
+Hierarchy ladder:
+
+IndustryRole list ordered by rank
+
+For each role:
+
+Person occupant (if any)
+
+Key stats (e.g. leadership/talent summary)
+
+For controlled-country companies:
+
+An Edit toggle that switches the sidebar into “lineup management” mode:
+
+Each role row shows a dropdown to select a different eligible employee (backed by /api/player/companies/[companyId]/positions/[roleId]/candidates).
+
+A “Vacant” option to clear the slot so the sim can auto-fill it next year.
+
+A small lock icon or checkbox to mark that slot as locked/unlocked, wired to the CompanyPosition.locked flag via /assign.
+
+The /api/company/[id]/hierarchy endpoint:
+
+Returns:
+
+company info (including worldId and countryId)
+
+hierarchy array (IndustryRole + optional occupant + locked flag)
+
+latestPerformance and performanceHistory arrays
+
+industryBenchmark and industryPeers
+
+an isEditable boolean that is true only when:
+
+the company belongs to the controlled country (company.countryId === World.controlledCountryId).
+
+/world/[id]/standings — World standings
+
+Uses:
+
+/api/world/[id]/standings
+
+/api/world/[id]/top-companies
+
+Data model:
+
+Standings API reads from CountryYearPerformance for the world’s currentYear:
+
+For each country:
+
+totalScore & components (companyScore, governmentScore, populationScore)
+
+Aggregated per-industry output from CompanyYearPerformance
+
+UI:
+
+Standings table:
+
+Rank
+
+Country
+
+Overall total (using totalScore)
+
+Overall average
+
+Per-industry totals (Tech, Finance, Research)
+
+Current rank vs last year’s rank:
+
+Small arrow: up/down/same
+
+Global industry performance:
+
+For each industry:
+
+World total output
+
+Average per company
+
+Best country in that industry (and its total output)
+
+Top Companies table:
+
+Top companies by outputScore for current year
+
+For each:
+
+Company name (linked)
+
+Country (linked)
+
+Industry
+
+outputScore
+
+This page behaves like a BBGM league standings page with:
+
+League table
+
+Recent history (trend)
+
+Champions baked into history (via CountryYearPerformance)
+
+“Teams” → countries
+
+/api/player-country (API detail for /player)
+
+Returns:
+
+type GovernmentOfficeRow = {
+id: number;
+name: string;
+prestige: number;
+holderId: number | null;
+holderName: string | null;
+fitScore: number | null; // 0–100, from leadership/judgment/integrity/charisma
+termYearsRemaining: number | null; // remaining years based on termLength vs currentYear
+};
+
+type PlayerCountryPayload = {
+name: string;
+worldName: string;
+population: number;
+companies: number;
+schools: number;
+employed: number;
+unemployed: number;
+offices: GovernmentOfficeRow[];
+performance?: CountryPerformanceSummary | null;
+worldId: number; // ID of the current world, used to scope Talent Search
+countryId: number; // ID of the controlled country, used as default filter for Talent Search
+};
+
+offices is derived as:
+
+Country-level offices (level = "Country") for the controlled country
+
+Ordered by prestige descending, top N (e.g., 8)
+
+Only active term (endYear = null) is considered for holder/term info
+
+This API powers the Government card, the performance panel, and the Talent & Scouting card on /player (via worldId/countryId).
+
+New player office-control APIs
+GET /api/player/offices/[officeId]/candidates
+
+Input: officeId (dynamic route param)
+
+Behavior:
+
+Validates that this office exists, belongs to the current world, and is a country-level office for the controlled country.
+
+Builds a candidate list of people who:
+
+Are alive
+
+Are in the controlled country
+
+Are old enough (e.g., ≥ 30)
+
+Do not currently hold another active office (with endYear = null) besides this one
+
+Computes a fitScore for each candidate using the same leadership/judgment/integrity/charisma mix as /api/player-country.
+
+Output:
+
+{ office: { id, name, prestige }, candidates: OfficeCandidate[] } where OfficeCandidate includes id, name, age, fitScore, currentOfficeName (if any), and isCurrentHolder.
+
+Used exclusively by the Reassign modal on /player.
+
+POST /api/player/offices/[officeId]/appoint
+
+Input body: { personId: number }
+
+Behavior:
+
+Validates:
+
+office belongs to controlled country in current world
+
+person exists, is alive, in the same world & country, and meets age constraints
+
+person is not already holding another active office (except this one)
+
+Inside a transaction:
+
+Ends any current term for this office by setting endYear = currentYear
+
+Creates a new Term for { officeId, personId, startYear = currentYear, endYear = null, playerLocked = true }
+
+Output:
+
+{ success: true, officeId, personId, newTermId } on success
+
+Effects:
+
+The Term is now marked playerLocked, so yearly auto-elections will not override this appointment while it remains valid.
+
+New player company-hierarchy control APIs
+GET /api/player/companies/[companyId]/positions/[roleId]/candidates
+
+Input: companyId, roleId (dynamic route params)
+
+Behavior:
+
+Validates:
+
+There is a world with a controlledCountryId set.
+
+The company exists, belongs to that world, and has countryId === controlledCountryId.
+
+The role exists and matches the company’s industry (IndustryRole.industry === Company.industry).
+
+Builds a candidate list of people who:
+
+Are alive
+
+Work for this company (active Employment with endYear = null)
+
+Belong to the same country as the company
+
+Optionally includes:
+
+Their current CompanyPosition role (if any)
+
+Some basic summary stats (e.g., intelligence, leadership, discipline, charisma).
+
+Output (conceptually):
+
+{ company: { id, name }, role: { id, name, rank }, candidates: CompanyPositionCandidate[] }, where each candidate includes:
+
+id, name, age
+
+short stat summary
+
+currentRoleName (if they already occupy a different slot in this company)
+
+Used exclusively by the hierarchy sidebar editor on /company/[id] for the controlled country.
+
+POST /api/player/companies/[companyId]/positions/[roleId]/assign
+
+Input body: { personId: number | null, locked?: boolean }
+
+Behavior:
+
+Validates:
+
+Same world/controlled-country check as above.
+
+The role matches the company’s industry.
+
+If personId is non-null:
+
+Person is alive
+
+Person is employed by this company
+
+Person is in the controlled country
+
+Inside a transaction:
+
+If there is an existing CompanyPosition for (companyId, roleId), update or delete it depending on the action.
+
+If personId is null:
+
+Clear the slot (delete the CompanyPosition row) to make it vacant.
+
+If personId is non-null:
+
+Move or create a CompanyPosition for (companyId, roleId, personId):
+
+If the person already has another CompanyPosition in this company, that old slot is cleared or moved so the person doesn’t occupy multiple roles simultaneously (BBGM-style depth chart uniqueness per player).
+
+Set locked = locked ?? (existing locked value or false if new).
+
+Returns the new/updated slot info.
+
+Effects:
+
+Gives the player a direct, deterministic way to control a company’s “lineup,” backed by the locked flag so that yearly promotions/hiring won’t undo their choices for that slot.
+
+DESIGN VISION: WHERE THIS IS GOING
+
+Today
+
+We have:
+
+A working generational world sim:
+
+Births, deaths, aging
+
+Education
+
+Jobs
+
+Basic marriages and friendships
+
+Government offices and terms
+
+Industry v0:
+
+Each company tagged with an industry string
+
+Global industry role templates (IndustryRole)
+
+CompanyPosition assignments seeded + maintained yearly
+
+Hierarchy-aware promotions and hiring
+
+A locked flag on CompanyPosition that, combined with the new company hierarchy UI, lets the player “pin” specific employees in specific roles for companies in the controlled country.
+
+Performance v1:
+
+CompanyYearPerformance computed deterministically each year
+
+CountryYearPerformance aggregating:
+
+companyScore
+
+governmentScore (v1, from offices and leader stats + prestige)
+
+populationScore (placeholder)
+
+totalScore and isChampion
+
+Company pages showing current performance, benchmark, peers, and history
+
+World standings showing:
+
+Current rankings
+
+5-year history
+
+Trend arrows
+
+Champion years
+
+Country pages that combine:
+
+Political history (offices, terms)
+
+Performance summary
+
+Country history (scores, rank, champion flags)
+
+Player dashboard that now surfaces:
+
+Government overview card (cabinet visibility + fit scores + term remaining)
+
+Country performance snapshot
+
+Interactive cabinet management via manual “Reassign” actions, giving the player direct control over who holds key offices and creating playerLocked terms respected by the sim.
+
+A Talent & Scouting panel that opens a world-aware TalentSearchModal, giving the player a global scouting tool to find high-potential people for future office/company roles and jump directly into their /person/[id] pages.
+
+A Youth Pipeline link and /player/youth page that expose the controlled country’s teenage and early-20s prospects in a single, sortable table, complete with education status and a composite “prospect grade” so the player can see at a glance whether their pipeline is deep or barren.
+
+For companies in the controlled country, the company page now essentially acts as a “depth chart” editor:
+
+Player can reassign and lock hierarchy slots.
+
+Yearly sim still autonomously promotes/hire in remaining slots.
+
+Tomorrow
+
+We want to grow this into a fully BBGM-like structure:
+
+Industries as “leagues”:
+
+Stronger identity for each industry
+
+Potential for industry-level awards and championships
+
+Government as the premier layer:
+
+Extend governmentScore beyond simple leader stats:
+
+Political stability
+
+Policy outcomes (careful, not a generic policy sim)
+
+Make government appointments a key player decision on /player
+
+PopulationScore evolution:
+
+Derived from health, education, wealth, and employment
+
+Impacts long-term talent and industrial potential
+
+Player-facing decisions:
+
+Assign key roles:
+
+Choose CEOs, Ministers, etc.
+
+Manage “pipelines”:
+
+High-potential people into critical roles
+
+Awards & legacy:
+
+Per-year:
+
+Country champion
+
+Company “titles” (top companies)
+
+Person-level awards (MVP, top executive, top minister)
+
+Over time:
+
+Dynasties (multi-year dominance)
+
+Hall of Fame for people and countries
+
+Trophy cases on country pages
+
+The youth pipeline will tie into this by:
+
+Feeding award candidates (e.g., “Rookie Minister of the Year,” “Top Prospect”)
+
+Letting the player see whether their long-term prospects are strong enough to sustain a dynasty or whether they need to aggressively recruit/import talent.
+
+What to avoid:
+
+Don’t drift into a pure policy slider sim.
+
+Don’t drift into full-blown life sim micro-management.
+
+Don’t reframe the player as a single person.
+
+The core identity is:
+
+“BBGM for countries, where the game is about structuring talent into roles and watching careers, institutions, and countries rise and fall over decades.”
+
+HOW TO ADD FEATURES SAFELY
+
+When implementing a new feature, always ask:
+
+Does it respect the current architecture?
+
+UI in src/app/*
+
+Simulation in src/lib/sim.ts
+
+Performance-related utilities in src/lib/performance.ts
+
+Government scoring integrated in sim.ts using existing models (Office, Term, Person)
+
+DB via Prisma
+
+Reset logic updated when schema changes
+
+Does it respect the domain model?
+
+Reuse:
+
+Person, Company, Employment, School, Enrollment, Office, Term
+
+IndustryRole, CompanyPosition
+
+CompanyYearPerformance, CountryYearPerformance
+
+If you need a new model (e.g., Awards), wire:
+
+Schema
+
+Migrations
+
+seed/reset
+
+sim
+
+UI
+
+Does it keep the player as the COUNTRY, not a person?
+
+Features should affect:
+
+The controlled country’s rankings, history, options
+
+Don’t introduce “play as a person” mechanics.
+
+Does it move toward BBGM-style gameplay?
+
+Roles, ladders, hierarchy
+
+Performance metrics and standings
+
+Seasons and history
+
+Have you updated everything you need?
+
+schema.prisma
+
+npx prisma migrate dev
+
+scripts/seedWorld.ts
+
+/api/world/reset
+
+sim.ts
+
+Any relevant API routes + pages
+
+For player-controlled government features, ensure:
+
+Term has appropriate fields (including playerLocked)
+
+/api/player-country and /api/player/offices/* stay in sync with any eligibility or scoring changes
+
+For player-controlled company hierarchy features, ensure:
+
+CompanyPosition has locked: Boolean.
+
+The yearly sim:
+
+Does not promote out of locked slots.
+
+Prefers to keep locked slots during validation/dedup.
+
+/ api/company/[id]/hierarchy, /api/player/companies/*, and the /company/[id] page stay in sync about:
+
+Role IDs
+
+Current occupants
+
+Locked flags
+
+isEditable logic for controlled-country companies.
+
+For global talent search features, ensure:
+
+/api/player-country continues to return worldId and countryId.
+
+Talent search APIs accept worldId/countryId filters and respect controlled-country constraints where appropriate.
+
+The TalentSearchModal and any future “assign from search” flows stay consistent with the existing office/company assignment rules.
+
+For youth pipeline features, ensure:
+
+/api/player/youth continues to resolve the controlled country correctly and applies the intended age band.
+
+computeProspectScoreAndGrade in src/lib/prospects.ts remains the single source of truth for prospectScore/prospectGrade so tuning is centralized.
+
+Any new UI that surfaces “prospect” information pulls from the same logic (rather than re-implementing grades ad hoc).
+
+Have you tested the basics?
+
+Reset world works and clears/resets all data including performance tables
+
+Sim 1 year works end-to-end
+
+CompanyYearPerformance and CountryYearPerformance rows appear as expected
+
+/company/[id], /country/[id], /world/[id]/standings, /player render without runtime errors
+
+Manual “Reassign” flows work:
+
+Government:
+
+Clicking Reassign opens the modal
+
+Candidates load
+
+Appointment succeeds and cabinet updates
+
+Auto sim years do not override playerLocked terms prematurely
+
+Company hierarchy (controlled country):
+
+/company/[id] shows an edit toggle for controlled-country companies.
+
+Loading candidates for a role returns sensible employees for that company.
+
+Assigning someone updates:
+
+The sidebar immediately
+
+The database (survives a page reload)
+
+Locked slots:
+
+Show a locked icon.
+
+Remain in place across sim years unless invalidated.
+
+Vacant slots:
+
+Are auto-filled next year if candidates exist.
+
+Talent Search:
+
+“Open Talent Search” button on /player is enabled for the controlled country.
+
+Modal opens and can query & display candidates.
+
+Clicking “View profile” opens /person/[id] in a new tab.
+
+Filters behave sensibly (age/stats/industry) and respect worldId/countryId scoping.
+
+Youth Pipeline:
+
+“Youth Pipeline” link appears in the /player header nav.
+
+/ player/youth loads without errors and shows a table of youth prospects for the controlled country when such people exist.
+
+Prospects are sorted with highest potentialOverall and prospectScore at the top.
+
+Education labels look reasonable (Primary/Secondary/University/Out of school/Not in school).
+
+Clicking a prospect’s name opens the correct /person/[id] page.
+
+/world/1/standings
+
+Countries sorted by totalScore
+
+Per-industry totals
+
+Global industry summary
+
+Top companies
+
+Rank changes and history glimpses
+
+Optional: inspect DB via Prisma Studio:
+
+npx prisma studio
+
+Check:
+
+Company rows with industry
+
+IndustryRole for each industry
+
+CompanyPosition rows per company (including locked flag)
+
+CompanyYearPerformance rows per company-year
+
+CountryYearPerformance rows with companyScore, governmentScore, populationScore, totalScore, isChampion for each world-year
+
+Term rows with playerLocked flags correctly set for manually appointed officeholders
+
+CODING STYLE & CONVENTIONS
+
+Use TypeScript consistently
+
+Prefer explicit types for:
+
+API responses
+
+sim.ts return types
+
+DB access utilities
+
+Keep functions small and focused
+
+Keep sim.ts as the central orchestrator of time-based changes
+
+Avoid “magic strings”:
+
+Use TS unions in code when appropriate
+
+Keep Company.industry as a flexible STRING, but wrap with unions in TS
+
+Comment non-trivial logic:
+
+Stat growth curves
+
+Role score calculations
+
+Performance calculations
+
+Complex promotions/hiring logic
+
+CountryYearPerformance aggregation, including governmentScore weighting
+
+Election logic and playerLocked behavior for government terms
+
+CompanyPosition.locked behavior for promotions/hiring/validation
+
+Think about determinism:
+
+If randomness is used, consider whether a seeding strategy may be needed later
+
+GOOD FIRST TASKS FOR NEW DEVELOPERS
+
+If you’re new to this codebase, here are some good entry points:
+
+Add a new field and surface it
+
+Example:
+
+Add prestige: Int to Company
+
+Show it on:
+
+/player
+
+/company/[id]
+
+/world/[id]/standings
+
+Steps:
+
+Update schema.prisma
+
+npx prisma migrate dev
+
+Update seedWorld.ts and /api/world/reset to give initial values
+
+Optionally evolve it over time in sim.ts
+
+Update relevant endpoints and pages
+
+Extend the Player dashboard
+
+Add a “Country Stats” block:
+
+Population
+
+Employed vs unemployed
+
+Number of companies and schools
+
+Maybe a short summary: “Ranked 2nd out of 5 this year” from CountryYearPerformance
+
+Hook into CountryYearPerformance via a small helper.
+
+Add a “Top N People” widget
+
+Example: “Top 10 by Intelligence” or “Top 10 by Prestige”.
+
+Implement new API route or extend /api/world
+
+Display on / or /player
+
+Enhance per-country industry page
+
+For each company:
+
+Show whether key roles (President, VP) are filled or vacant
+
+Pull current-year outputScore, if desired, and show a mini performance indicator
+
+This builds intuition: which hierarchies and leaders are actually producing results.
+
+Extend company performance panel
+
+Use performanceHistory from /api/company/[id]/hierarchy to add derived metrics:
+
+“Up X vs last year”
+
+“3-year trend: improving / declining”
+
+Extend government UI & scoring
+
+Add a detail view for the controlled country’s government:
+
+Decompose governmentScore into per-office contributions
+
+Add tooltips on the /player Government card explaining:
+
+Why a minister has a high/low fit score
+
+Experiment (carefully) with different GOVERNMENT_SCORE_WEIGHT values.
+
+Extend the manual appointment system, e.g., adding:
+
+Cooldowns before an office can be reassigned again
+
+Costs or risks associated with firing ministers
+
+UI indicators for playerLocked vs auto-elected terms
+
+Extend the company hierarchy editor
+
+Add better candidate sorting (e.g., by a composite score tailored to each role tier).
+
+Add visual cues that show:
+
+Which slots are locked
+
+Which employees are “out of position” (e.g., low fit for that rank).
+
+Add a small summary panel on /player that:
+
+Lists “key companies” in the controlled country and their top hierarchy roles.
+
+Highlights weak spots (vacant/low-score roles).
+
+Extend global Talent Search
+
+Add richer filters (e.g., sliders for specific stats, search by name, “must have prior minister experience”).
+
+Add quick actions from the TalentSearchModal, like:
+
+“Jump to /company/[id] where they work”
+
+“Bookmark” a person for later review on /player
+
+Eventually, allow piping a search result directly into an office/company assignment flow, while respecting all existing validation (controlled country, employment, age, etc.).
+
+Extend the youth pipeline
+
+Add filters to /player/youth (e.g., min potential slider, filter by education level, filter by prospectGrade).
+
+Add a small “Top Prospects” widget on /player that shows, say, the top 5 A-grade youth from /api/player/youth and links into the full page.
+
+Add UI badges on /person/[id] when a person qualifies as a high-grade youth prospect for the controlled country.
+
+Tie youth prospects into future award systems (“Prospect of the Year,” “Best Young Executive,” etc.).
+
+MENTAL MODEL SUMMARY
+
+Keep this in your head:
+
+This is BBGM for countries.
+
+The player controls one country, not a person.
+
+The core loop is:
+
+Stats → Roles → Company performance → Country performance → Standings → Champions & history
+
+IndustryRole, CompanyPosition, CompanyYearPerformance, and CountryYearPerformance are the backbone.
+
+Government (Office + Term + governmentScore) is now a real, scored contributor to country success.
+
+Manual cabinet overrides (playerLocked Terms) let the player exert direct control over that government layer, similar to a GM reshuffling a coaching staff or front office.
+
+Manual company lineup management (CompanyPosition + locked) for controlled-country companies lets the player:
+
+Set their “starting lineup” in each company’s hierarchy.
+
+Lock those decisions in place while the sim handles everything else around them.
+
+Global Talent Search gives the player a scouting lens across the whole world, turning a huge, noisy population into a curated pipeline of potential leaders and executives they can funnel into those government and company hierarchies.
+
+The Youth Pipeline (/player/youth) turns the controlled country’s teenage and early-20s population into a structured prospects list, making the long-term talent pipeline tangible: you can literally see which future stars are coming and whether your country is headed toward a golden generation or a drought.
+
+Everything you add should strengthen:
+
+Hierarchy
+
+Deterministic performance
+
+Yearly seasons
+
+Long-term history & dynasties
+
+If you follow this document, you should be able to build new features confidently, without breaking the core simulation or drifting away from the game’s intended identity.
+
+### [2025-12-08] Education Impact Modeling v1 Added
+- Added applyEducationBuffForYear helper in sim.ts.
+- Each active enrollment now injects a yearly stat buff into the BBGM-style development pipeline.
+- Stat categories affected depend on school level:
+  • Primary → cognitive + discipline (small)
+  • Secondary → cognitive + discipline (moderate)
+  • University → cognitive + social (larger)
+- All scaled by school prestige (0–100).
+- No schema changes required; entirely contained in sim.ts.
+- Manual testing workflow documented: create two similar 18yos, enroll one in high-prestige university, sim years, compare.
+
+### [2025-12-08] Player University Admission System
+- Added new `PlayerUniversityDecision` Prisma model with relations to World, Country, and Person.
+- Implemented POST/GET logic in `/api/player/youth` for saving player-selected university admissions.
+- Integrated per-country university slot caps (slots = # of universities * 50).
+- Updated `tickYear` to override university enrollment for the controlled country using player decisions.
+- Updated Youth Pipeline UI to display eligibility, show admission checkboxes, enforce caps, and surface “New this year” enrollment feedback.
+- Added client-side state syncing, save operations, and admission summaries.
+
+### [2025-12-08] Person-Year Performance System
+- Added new `PersonYearPerformance` Prisma model with relations to World, Person, and Company.
+- Stores per-person yearly contribution metrics: talentScore, leadershipScore, reliabilityScore, industry, year, and combined contributionScore.
+- Integrated computation into `tickYear` so contributions are generated alongside CompanyYearPerformance and CountryYearPerformance without on-the-fly recomputation.
+- Updated `/api/world/reset` and `scripts/seedWorld.ts` to safely delete PersonYearPerformance rows before deleting people/companies/world (prevents FK errors).
+- Verified end-to-end pipeline: schema → migration → reset → tick → new rows generated for each occupied CompanyPosition.
+- No UI yet; this lays the foundation for leaderboards, awards, and detailed person career/history pages.
