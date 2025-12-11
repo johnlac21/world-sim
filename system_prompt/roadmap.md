@@ -8,9 +8,7 @@ DEVELOPER_ONBOARDING.md → append to “Dev Changelog”
 ROADMAP.md → move completed ticket to Section 4 + LLM proposes next ticket(s)
 
 ==================================================
-
 1. NEXT TICKETS (ACTIVE BACKLOG)
-
 ==================================================
 
 (Only this section changes every iteration.
@@ -19,29 +17,26 @@ The LLM inserts new tickets after a completion.)
 
 Current backlog:
 
-14. VgAR (Value Generated Above Replacement) per person-year
+23. UI Layout Shell (BBGM-style top nav + sidebar + page wrapper)
+    (Global page frame used across /player, /company/[id], /world/[id]/standings, etc.)
 
-15. Awards system v1 (Company + Person awards)
+24. Player Dashboard UI v2 (BBGM-style three-column layout:
+    mini-standings, country dashboard panels, world headlines)
 
-16. Awards UI: world + entity-level surfacing
+25. Shared UI Components Library
+    (Tables, panels/cards, standings rows, depth chart blocks, section headers)
 
-17. Year-end “Season Recap” event log
+26. Company Page UI v2
+    (BBGM depth-chart layout, two-column structure, cleaner performance panels)
 
-18. International movement v1
+27. Standings Page UI v2
+    (BBGM table styling, trend arrows, better per-industry summaries)
 
-19. Country prestige feedback loop
-
-20. Dev-facing sim diagnostics dashboard
-
-21. University Admissions UI v2 (filtering, auto-sort, admit-all button, cohort stats)
-
-22. Person Performance Career Page UI  
-    (new ticket replacing completed #13; displays yearly contributions, company history, and contributionScore trends)
+28. Person Page UI v2
+    (BBGM player-card layout, attributes grid, career performance table)
 
 ==================================================
-
 2. UPCOMING SYSTEMS (MEDIUM-TERM)
-
 ==================================================
 
 These systems will eventually be decomposed into multiple fine-grained tickets.
@@ -60,9 +55,7 @@ Hall of Fame / Historical Records System
 Save/Load Worlds + import/export formats
 
 ==================================================
-
 3. LONG-TERM VISION (TOP-LEVEL THEMES)
-
 ==================================================
 
 Rarely changed—these guide all ticket design.
@@ -75,9 +68,7 @@ History, dynasties, eras; a living world timeline
 Addictive optimization loop: Sim → Analyze → Improve → Dominate
 
 ==================================================
-
 4. COMPLETED TICKETS
-
 ==================================================
 
 Append new items here as brief bullets.
@@ -99,9 +90,7 @@ Example: Company Performance page (benchmarks, peers, charts)
 Example: Player-Country Dashboard (/player)
 
 ==================================================
-
 5. NOTES
-
 ==================================================
 
 Section (1) should ALWAYS reflect the exact next tickets your workflow will use.

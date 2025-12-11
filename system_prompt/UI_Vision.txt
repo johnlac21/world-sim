@@ -1,0 +1,556 @@
+🌍 WORLD SIM BBGM — UI VISION DOCUMENT (v1.0)
+
+A unifying design guide for the visual identity, layout structure, and UI components of the World Sim BBGM interface.
+
+Last updated: UI Modernization Sprint Start
+
+1. UI Philosophy
+
+World Sim BBGM inherits its design identity from Basketball GM:
+
+Data-forward: tables, stats, and text-first presentation
+
+Dense information layout: minimal whitespace, compact rows
+
+Minimalistic visual design: avoid ornamentation, focus on clarity
+
+Zero-friction navigation: side nav, top nav, consistent links
+
+Fast scanning: bold titles, descriptive section headers, predictable positions
+
+BBGM-like structure but NOT copying assets
+
+Consistency over decoration — every panel looks and behaves the same
+
+Utility-first — the player must feel like a “GM managing a country” through numbers, lists, and dashboards
+
+This document defines the exact components, layouts, colors, and behaviors that the UI must follow.
+
+2. Global Layout Model
+
+All major pages share a consistent UI shell, composed of:
+
+2.1 Top Navigation Bar
+
+Appears on every page.
+
+Left:
+
+Game logo / emoji (🏛️ or 🏀 or 🌍 depending on eventual branding)
+
+Game title: World Sim BBGM
+
+Link to homepage/world overview
+
+Center / Slightly Right:
+
+Current world name
+
+Current simulated year
+
+(Optional) Context text like: “Year 46 — Midseason”
+
+Right:
+
+Button: Sim 1 Year
+
+Button: Reset World
+
+Link to /player (your country dashboard)
+
+Search icon (global person/company search)
+
+Style:
+
+White background
+
+Height: 48px
+
+Bottom border: 1px solid #ddd
+
+Font size: 14px
+
+2.2 Left Sidebar Navigation
+
+Used on all major pages except the landing/reset page.
+
+Sections and Links:
+WORLD
+
+Standings
+
+History
+
+Top Companies
+
+Awards (future)
+
+Events (future)
+
+COUNTRY
+
+Dashboard (/player)
+
+Industries
+
+Country History
+
+Government
+
+Finances (future)
+
+PEOPLE
+
+Youth Pipeline
+
+Leaders
+
+People Search
+
+Notable Families (future)
+
+COMPANIES
+
+All Companies
+
+Industry Leaders
+
+Ranking Charts
+
+Style:
+
+Width: 220–240px
+
+Font size: 13px
+
+Section headers bold, all-caps, grey (#777)
+
+Links normal-weight, hover blue
+
+Background: solid white
+
+Right border: 1px solid #ddd
+
+2.3 Page Types
+
+Every page must adopt one of three layout templates:
+
+A. Dashboard Layout (3-column)
+
+Used for:
+
+/player (controlled country dashboard)
+
+(Later) league overview dashboards
+
+Columns:
+
+Left: Mini-standings or contextual table
+
+Center: Main dashboard (record / scores / panels)
+
+Right: Headlines and news cards
+
+Grid:
+
+| [220px] | [flex:1.5] | [flex:1.2] |
+
+B. Two-Column Layout
+
+Used for:
+
+Company page
+
+Person page
+
+Country page
+
+Columns:
+
+Left (main content): performance panels, attributes, charts
+
+Right (sidebar): depth chart, roles, metadata, quick info
+
+Grid:
+
+| [flex:2] | [flex:1.2] |
+
+C. Full-Width Table Layout
+
+Used when the entire screen is a list:
+
+Standings
+
+Rankings
+
+Awards lists
+
+Top companies
+
+Margins: 16–32px
+Table occupies 100% width inside main content container.
+
+3. Component Library (UI System)
+
+All reusable UI components must follow this spec.
+
+3.1 Panel / Card Component
+
+Container for any BBGM-like block.
+
+Style:
+
+White background
+
+Border: 1px solid #ddd
+
+Border radius: 6px
+
+Padding: 12px
+
+Title font: 15px semi-bold
+
+Spacing between title + content: 4px
+
+Card nesting:
+
+You MAY put panels inside panels, but avoid >2 levels deep.
+
+3.2 Table Component
+
+Core table appearance across standings, leaders, youth pipeline, performance lists.
+
+Rules:
+
+Font size: 13px
+
+Row height: compact (28–32px)
+
+Background: white
+
+Odd rows: #fafafa
+
+Hover row: #eef3ff
+
+Borders: thin (#e3e3e3)
+
+Numbers: right-aligned
+
+Names: left-aligned
+
+Sorting icons: up/down arrows, grey
+
+Interaction:
+
+Clicking row navigates if applicable
+
+Hover shows pointer cursor
+
+3.3 Depth Chart / Hierarchy Component
+
+Used for:
+
+Company hierarchy
+
+Government offices
+
+Specification:
+
+One row per role
+
+Left: role name
+
+Middle: person name (clickable)
+
+Right: stat-fit badge or simple colored circle
+
+Locked icon on the far right (padlock outline)
+
+Rows tightly spaced (28–30px)
+
+Optional role color-coding by rank (light greyscale gradient)
+
+3.4 Headline Card
+
+Used in dashboard right column to show:
+
+Awards
+
+Promotions
+
+Retirements
+
+Major events (future)
+
+Visual spec:
+
+Horizontal card: avatar left, text right
+
+Tag badge: yellow (Award), orange (Retirement), blue (Movement)
+
+Avatar: 40×40px placeholder unless real portraits added
+
+Rounded border + soft background (#fafafa)
+
+3.5 Tabs Component (future use)
+
+Tabs across the top of detail views:
+
+Overview
+
+History
+
+Ratings / Stats
+
+Roles
+
+Events (future)
+
+BBGM uses minimalistic tabs: text-only, underline for active.
+
+3.6 Typography Rules
+
+Headers:
+
+Page title: 22px bold
+
+Section title: 15px semi-bold
+
+Body:
+
+Main text: 14px
+
+Tables: 13px
+
+Subtext: 12px grey (#777)
+
+Line spacing: compressed (1.2–1.3)
+
+3.7 Color Palette
+Use Case	Color
+Background	#f2f2f2
+Panel/Card background	#ffffff
+Borders	#dddddd
+Hover	#eef3ff
+Text primary	#222222
+Text secondary	#555555
+Links	#0066cc
+Good (↑)	#10b981
+Bad (↓)	#ef4444
+Warning tag	#facc15
+
+Palette is deliberately muted to match BBGM’s utilitarian tone.
+
+3.8 Spacing System
+
+Use an 4/8/16 scale:
+
+XS: 4px
+
+SM: 8px
+
+MD: 12px
+
+LG: 16px
+
+XL: 24px
+
+Avoid big empty spaces — BBGM is compact.
+
+4. Page-by-Page Vision (Blueprint)
+
+This section outlines how each major page should look once converted.
+
+4.1 /player — Controlled Country Dashboard
+
+3-column layout identical to BBGM team dashboard:
+
+Left:
+
+Mini standings
+
+Controlled country highlighted
+
+Center:
+
+Large “record” equivalent:
+
+e.g., Country Score 1034 (2nd of 5)
+
+Panels:
+
+Team Leaders (top contributors)
+
+Team Stats (companyScore, govScore, avg company output)
+
+Youth Stars (top prospects)
+
+Finances or Economy (placeholder)
+
+Right:
+
+Headlines
+
+Event cards
+
+“Top companies this year” or “Rising talent”
+
+4.2 /company/[id]
+
+BBGM team page analog.
+
+Left:
+
+Performance summary card
+
+Industry benchmark card
+
+Peers list
+
+Year-by-year history chart (bar chart)
+
+Right:
+
+Company hierarchy depth chart
+
+Role-fit icons
+
+Lock icons
+
+4.3 /world/[id]/standings
+
+BBGM standings page analog:
+
+Single wide table
+
+Columns: Country, Total Score, Company Score, Gov Score, Rank Δ
+
+Below main table:
+
+Per-industry breakdown
+
+Top companies list
+
+4.4 /person/[id]
+
+BBGM player profile analog:
+
+Left:
+
+Name + age header
+
+Stat attributes grid (cognitive, leadership, reliability, personality)
+
+Performance trend (from PersonYearPerformance)
+
+History of employment, education, offices, company roles
+
+Right:
+
+Quick facts card:
+
+Country
+
+Industry experience
+
+PotentialOverall
+
+Prestige
+
+Career summary
+
+4.5 /country/[id]
+
+Country equivalent of “Team History”:
+
+Left:
+
+Country performance over years
+
+Champion markers
+
+Industry summary
+
+Top company outputs
+
+Right:
+
+Government structure (current + past terms)
+
+5. Interaction Rules
+
+All clickable text → blue and underlined on hover
+
+All tables sortable by clicking headers
+
+All person/company names are links
+
+All hover rows highlight
+
+All stats show green/red for positive/negative movement
+
+All modals use standardized panel style
+
+Lock icons toggle inline with minimal animation
+
+6. Future Extensions Supported by This Vision
+
+This UI structure supports all medium-term roadmap features:
+
+Awards (list + per-person surfacing)
+
+Season recap events
+
+International movement highlights
+
+Prestige visualization
+
+Country management menu
+
+Hall of Fame
+
+Event log / news feed
+
+Personality-driven storylines
+
+Save/load UI
+
+The vision is intentionally stable so UI work never needs rewriting.
+
+7. Non-Goals
+
+This UI vision intentionally rejects:
+
+flashy animations
+
+overly modern “Airbnb”-style spacing
+
+dark mode (for now)
+
+portrait-heavy layout (unless optional)
+
+mobile-first design (full management sims are desktop-biased)
+
+Goal is clarity, density, and strategic feel, not beauty.
+
+8. Deliverables for UI Sprint 1 (Based on This Vision)
+
+In this sprint, the UI team will implement:
+
+GameLayout shell (top nav + sidebar)
+
+Three-column Player Dashboard
+
+Shared Component Library
+
+Company Page UI v2
+
+Standings UI v2
+
+Person Page UI v2
+
+These directly correspond to:
+
+Tickets 23–28 in the roadmap
+
+Achieving the “80–90% BBGM similarity” goal
