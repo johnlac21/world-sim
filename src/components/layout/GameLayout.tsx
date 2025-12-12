@@ -221,24 +221,6 @@ export function GameLayout({ children }: Props) {
               <span className="italic text-gray-400">World overview</span>
             )}
           </div>
-
-          {/* RIGHT: My Country + search */}
-          <div className="flex items-center gap-2">
-            <Link
-              href="/player"
-              className="inline-flex items-center rounded bg-blue-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-blue-700"
-            >
-              My Country
-            </Link>
-
-            <button
-              type="button"
-              className="ml-1 inline-flex h-7 w-7 items-center justify-center rounded-full border border-gray-300 bg-white text-xs text-gray-600 hover:bg-gray-50"
-              title="Global search (people/companies)"
-            >
-              🔍
-            </button>
-          </div>
         </div>
       </header>
 

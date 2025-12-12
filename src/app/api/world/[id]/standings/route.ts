@@ -180,8 +180,13 @@ export async function GET(
         currentYear,
         controlledCountryId: world.controlledCountryId ?? null,
       },
-      standings,
+      worldId: world.id,
+      year: currentYear,
+      playerCountryId: world.controlledCountryId ?? null,
+      countries: standings,
+      standings, // keep old key for any existing callers
     },
     { status: 200 },
   );
 }
+

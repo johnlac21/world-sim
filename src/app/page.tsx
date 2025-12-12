@@ -8,12 +8,13 @@ import { useRouter } from "next/navigation";
 import { formatScore } from "@/components/ui/formatScore";
 import { CountryStandingsMini } from "@/components/world/CountryStandingsMini";
 import { CountriesList } from "@/components/world/CountriesList";
-import { WorldSnapshotPanel } from "@/components/world/WorldSnapshotPanel";
-import { TopCountriesTable } from "@/components/world/TopCountriesTable";
 import { WorldStatsPanel } from "@/components/world/WorldStatsPanel";
-import { TopCompaniesTable } from "@/components/world/TopCompaniesTable";
 import { LeagueHeadlines } from "@/components/world/LeagueHeadlines";
 import { PeopleSampleList } from "@/components/world/PeopleSampleList";
+import { PlayerCountryHeadline } from "@/components/world/PlayerCountryHeadline";
+import { PlayerCountryLeaders } from "@/components/world/PlayerCountryLeaders";
+import { PlayerCountryStatsPanel } from "@/components/world/PlayerCountryStatsPanel";
+import { GlobalLeadersTable } from "@/components/world/GlobalLeadersTable";
 import type { WorldStats } from "@/components/world/types";
 
 type WorldSummaryPerson = {
@@ -162,7 +163,9 @@ export default function WorldOverviewPage() {
           throw new Error(`Standings load failed (${standingsRes.status})`);
         }
         if (!topCompaniesRes.ok) {
-          throw new Error(`Top companies load failed (${topCompaniesRes.status})`);
+          throw new Error(
+            `Top companies load failed (${topCompaniesRes.status})`
+          );
         }
 
         const standingsJson = (await standingsRes.json()) as StandingsResponse;
@@ -240,15 +243,23 @@ export default function WorldOverviewPage() {
   const standingsCountries: CountryStanding[] =
     getStandingsCountriesFromAny(standings);
 
-  const topCountries = standingsCountries
-    .slice()
-    .sort((a, b) => a.currentRank - b.currentRank)
-    .slice(0, 5);
-
   const worldStats = computeWorldStats(
     standingsCountries,
     standings?.year ?? null
   );
+
+  const playerCountryId = standings?.playerCountryId ?? null;
+
+  const playerStanding: CountryStanding | null =
+    playerCountryId != null
+      ? standingsCountries.find((c) => c.countryId === playerCountryId) ?? null
+      : null;
+
+  const playerCountryLeaders: TopPerson[] = playerStanding
+    ? topPeople
+        .filter((p) => p.countryId === playerStanding.countryId)
+        .slice(0, 3)
+    : [];
 
   // --- Render --------------------------------------------------------
   if (loading && !world && !standings) {
@@ -320,13 +331,33 @@ export default function WorldOverviewPage() {
           <CountriesList standings={standingsCountries} />
         </div>
 
-        {/* CENTER COLUMN – snapshot, top countries, stats, top companies */}
+        {/* CENTER COLUMN – BBGM-style player country dashboard */}
         <div className="col-span-12 md:col-span-6 flex flex-col gap-4">
-          <WorldSnapshotPanel world={world} companyCount={companyCount} />
-          <TopCountriesTable countries={topCountries} />
-          <WorldStatsPanel stats={worldStats} />
-          <TopCompaniesTable companies={topCompanies} />
+          <PlayerCountryHeadline
+            worldName={world.name}
+            currentYear={world.currentYear}
+            totalCountries={standingsCountries.length}
+            currentRank={playerStanding?.currentRank ?? null}
+            totalScore={playerStanding?.totalScore ?? null}
+          />
+
+          {/* Row 1: Country Leaders / Country Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <PlayerCountryLeaders leaders={playerCountryLeaders} />
+            <PlayerCountryStatsPanel
+              totalScore={playerStanding?.totalScore ?? null}
+              currentRank={playerStanding?.currentRank ?? null}
+              totalCountries={standingsCountries.length}
+            />
+          </div>
+
+          {/* Row 2: Global Leaders / World Stats (Finances analogue) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <GlobalLeadersTable leaders={topPeople} />
+            <WorldStatsPanel stats={worldStats} />
+          </div>
         </div>
+
 
         {/* RIGHT COLUMN – headlines + people sample */}
         <div className="col-span-12 md:col-span-3 flex flex-col gap-4">
