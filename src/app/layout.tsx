@@ -1,34 +1,18 @@
 // src/app/layout.tsx
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
-import { GameLayout } from "@/components/layout/GameLayout";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+import './globals.css';
+import type { Metadata } from 'next';
+import type { ReactNode } from 'react';
+import { GameLayout } from '@/components/layout/GameLayout';
 
 export const metadata: Metadata = {
-  title: "World Sim BBGM",
-  description: "BBGM-style world management sim for countries, industries, and governments.",
+  title: 'World Sim BBGM',
+  description: 'World simulation game inspired by Basketball GM',
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+      <body>
         <GameLayout>{children}</GameLayout>
       </body>
     </html>

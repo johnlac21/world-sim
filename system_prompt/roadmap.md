@@ -18,48 +18,30 @@ Shared UI Components Library
 
 Standardized UI primitives (cards, tables, headers, depth-chart rows, badges).
 
-Company Page UI v2
-
-Two-column BBGM layout, upgraded hierarchy sidebar, performance panels.
-
-Standings Page UI v2
-
-Improved table styling, trend arrows, per-industry summaries.
-
-Person Page UI v2
-
-Player-card style layout, attribute grid, timeline view, PYP integration.
-
 Season Headlines & Event Feed v1
 
 Automatic yearly recap generated after each sim-year; displayed on /player and /world.
+
+Person Career Summary Page v1 (NEW — replaces 3 completed UI tickets)
+
+Standalone career page summarizing full PersonYearPerformance history, awards, offices held, role evolution, and career arcs.
+Provides consistent URLs for long-term historical browsing (e.g., /person/[id]/career).
 
 2. UPCOMING SYSTEMS (MEDIUM-TERM)
 
 (Stable; not modified.)
 
 Industry Roles System v1
-
 Company Position System v1
-
 Personality Archetypes & Behavioral Traits
-
 Dynamic Talent Pipeline (youth → education → companies)
-
 Company Performance v2 (bonuses, multipliers, prestige curves)
-
 Country Performance v2 (gov score v2, population productivity, investments)
-
 Player Actions & Country Management Menu
-
 Simulation Settings (speed, seeds, auto-sim)
-
 Events System (shocks, scandals, crises, elections)
-
 Awards System (MVPs, All-Industry teams, championships UI)
-
 Hall of Fame / Historical Records
-
 Save/Load Worlds + import/export formats
 
 3. LONG-TERM VISION (TOP-LEVEL THEMES)
@@ -67,15 +49,10 @@ Save/Load Worlds + import/export formats
 (Stable; not modified.)
 
 A BBGM-style competitive world with yearly national standings
-
 Deep industry hierarchies modeled like sports leagues
-
 Deterministic stats driving corporate + national outcomes
-
 Generational life simulation (potential → peak → decline)
-
 History, eras, dynasties — a persistent living timeline
-
 Addictive loop: Sim → Analyze → Improve → Dominate
 
 4. COMPLETED TICKETS
@@ -83,8 +60,8 @@ Addictive loop: Sim → Analyze → Improve → Dominate
 (Append-only.)
 
 Education Impact Modeling v1
-University Admission Controls (Player Country)
 
+University Admission Controls (Player Country)
 UI controls, eligibility hints, PlayerUniversityDecision model, backend GET/POST, sim-time overrides.
 
 PersonYearPerformance Model
@@ -98,6 +75,18 @@ Global layout (sidebar + top nav), GameLayout wrapper, globals.css cleanup.
 Player Dashboard UI v2
 
 Three-column dashboard: mini-standings, country stats, government summary, headlines, youth preview.
+
+Company Page UI v2
+
+Two-column BBGM layout, upgraded hierarchy sidebar, performance panels, industry peers + benchmark.
+
+Standings Page UI v2
+
+Wide BBGM-style table, trend arrows, player-country highlighting, integrated Top Companies and per-industry summaries.
+
+Person Page UI v2
+
+Player-card layout, grouped attribute grid, PersonYearPerformance chart, full career/role/office/education/employment histories.
 
 5. WORKFLOW NOTES
 

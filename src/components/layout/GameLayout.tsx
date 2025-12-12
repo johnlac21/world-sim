@@ -1,9 +1,9 @@
 // src/components/layout/GameLayout.tsx
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
 
 type WorldSummary = {
   id: number;
@@ -39,9 +39,13 @@ export function GameLayout({ children }: Props) {
     async function fetchWorld() {
       try {
         setLoadingWorld(true);
-        const res = await fetch("/api/world");
+        const res = await fetch('/api/world');
         if (!res.ok) return;
-        const json = (await res.json()) as { id: number; name: string; currentYear: number };
+        const json = (await res.json()) as {
+          id: number;
+          name: string;
+          currentYear: number;
+        };
         if (!cancelled) {
           setWorld({
             id: json.id,
@@ -68,7 +72,7 @@ export function GameLayout({ children }: Props) {
 
     async function fetchPlayerCountry() {
       try {
-        const res = await fetch("/api/player-country");
+        const res = await fetch('/api/player-country');
         if (!res.ok) return;
         const json = (await res.json()) as {
           name: string;
@@ -97,15 +101,15 @@ export function GameLayout({ children }: Props) {
   const countryId = playerCountry?.countryId;
 
   const isActive = (href: string) => {
-    if (href === "/") return pathname === "/";
+    if (href === '/') return pathname === '/';
     return pathname.startsWith(href);
   };
 
   const handleSimOneYear = async () => {
     try {
       setSimLoading(true);
-      await fetch("/api/sim/year", { method: "POST" });
-      // Force a full reload so every page re-runs its useEffect fetches
+      await fetch('/api/sim/year', { method: 'POST' });
+      // full reload so all pages refetch
       window.location.reload();
     } finally {
       setSimLoading(false);
@@ -114,20 +118,18 @@ export function GameLayout({ children }: Props) {
 
   const handleResetWorld = async () => {
     const confirmReset = window.confirm(
-      "Reset world and wipe all history? This cannot be undone."
+      'Reset world and wipe all history? This cannot be undone.',
     );
     if (!confirmReset) return;
 
     try {
       setResetLoading(true);
-      await fetch("/api/world/reset", { method: "POST" });
-      // Same idea: full reload so all data is fresh
+      await fetch('/api/world/reset', { method: 'POST' });
       window.location.reload();
     } finally {
       setResetLoading(false);
     }
   };
-
 
   return (
     <div className="min-h-screen bg-[#f2f2f2] text-[#222222]">
@@ -144,7 +146,7 @@ export function GameLayout({ children }: Props) {
         </div>
 
         {/* Center: world name + year */}
-        <div className="hidden md:flex items-baseline gap-2 text-xs text-gray-600">
+        <div className="hidden items-baseline gap-2 text-xs text-gray-600 md:flex">
           {world ? (
             <>
               <span className="font-medium">{world.name}</span>
@@ -162,16 +164,16 @@ export function GameLayout({ children }: Props) {
           <button
             onClick={handleSimOneYear}
             disabled={simLoading}
-            className="hidden sm:inline-flex items-center rounded border border-gray-300 bg-white px-2 py-1 text-[11px] font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+            className="hidden items-center rounded border border-gray-300 bg-white px-2 py-1 text-[11px] font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60 sm:inline-flex"
           >
-            {simLoading ? "Sim…" : "Sim 1 Year"}
+            {simLoading ? 'Sim…' : 'Sim 1 Year'}
           </button>
           <button
             onClick={handleResetWorld}
             disabled={resetLoading}
-            className="hidden sm:inline-flex items-center rounded border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-medium text-red-700 hover:bg-red-100 disabled:opacity-60"
+            className="hidden items-center rounded border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-medium text-red-700 hover:bg-red-100 disabled:opacity-60 sm:inline-flex"
           >
-            {resetLoading ? "Resetting…" : "Reset World"}
+            {resetLoading ? 'Resetting…' : 'Reset World'}
           </button>
 
           <Link
@@ -202,13 +204,12 @@ export function GameLayout({ children }: Props) {
               label="Standings"
               active={isActive(`/world/${worldId}/standings`)}
             />
-            {/* Future links can piggyback on the same page via anchors */}
             <SidebarLink
               href={`/world/${worldId}/standings#top-companies`}
               label="Top Companies"
               active={
                 pathname.startsWith(`/world/${worldId}/standings`) &&
-                pathname.includes("top-companies")
+                pathname.includes('top-companies')
               }
               subtle
             />
@@ -219,7 +220,7 @@ export function GameLayout({ children }: Props) {
             <SidebarLink
               href="/player"
               label="Dashboard"
-              active={isActive("/player")}
+              active={isActive('/player')}
             />
             {countryId && (
               <>
@@ -243,12 +244,12 @@ export function GameLayout({ children }: Props) {
             <SidebarLink
               href="/player/youth"
               label="Youth Pipeline"
-              active={isActive("/player/youth")}
+              active={isActive('/player/youth')}
             />
             <SidebarLink
               href="/leaders"
               label="Leaders"
-              active={isActive("/leaders")}
+              active={isActive('/leaders')}
             />
           </SidebarSection>
 
@@ -259,7 +260,7 @@ export function GameLayout({ children }: Props) {
               label="All Companies"
               active={
                 pathname.startsWith(`/world/${worldId}/standings`) &&
-                pathname.includes("companies")
+                pathname.includes('companies')
               }
               subtle
             />
@@ -267,8 +268,11 @@ export function GameLayout({ children }: Props) {
         </aside>
 
         {/* Main content area */}
-        <main className="flex-1 min-h-[calc(100vh-3rem)] px-3 py-3 md:px-4 md:py-4">
-          <div className="mx-auto max-w-6xl">{children}</div>
+        <main className="flex-1 min-h-[calc(100vh-3rem)] bg-[#f2f2f2]">
+          {/* Centered white sheet like BBGM */}
+          <div className="mx-auto max-w-6xl border-x border-gray-200 bg-white px-3 py-3 md:px-4 md:py-4">
+            {children}
+          </div>
         </main>
       </div>
     </div>
@@ -303,13 +307,13 @@ function SidebarLink({ href, label, active, subtle }: SidebarLinkProps) {
     <Link
       href={href}
       className={[
-        "flex items-center rounded px-2 py-1 text-[13px]",
+        'flex items-center rounded px-2 py-1 text-[13px]',
         active
-          ? "bg-blue-50 font-semibold text-blue-700"
+          ? 'bg-blue-50 font-semibold text-blue-700'
           : subtle
-          ? "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
-          : "text-gray-700 hover:bg-gray-50",
-      ].join(" ")}
+          ? 'text-gray-500 hover:bg-gray-50 hover:text-gray-800'
+          : 'text-gray-700 hover:bg-gray-50',
+      ].join(' ')}
     >
       {label}
     </Link>
