@@ -397,3 +397,28 @@ Am I:
  Naming files by domain (world, country, company, person) and feature (TopCompaniesTable, WorldStatsPanel, etc.)?
 
 If yes to all, you’re building frontend in the “World Sim BBGM way” and future pages will be easy to maintain and extend.
+
+Ticket Notes — Sim Dropdown Header Integration
+
+Title: Global Header Refactor — Sim Dropdown Button
+
+Added BBGM-style green “Sim ▾” dropdown button to the global header next to World Sim BBGM.
+
+Implemented a reusable fixed-position dropdown system using getBoundingClientRect().
+→ This pattern should be used for all future header overlays (notifications, menus, filters).
+
+The dropdown contains Sim 1 year and Reset world actions; uses click-outside to close.
+
+Ensured no header reflow: the center title no longer shifts and the button no longer moves vertically.
+
+No new paths or routes were added; all changes were contained in GameLayout.tsx.
+
+This establishes the standard pattern for global UI chrome:
+
+Header actions live in GameLayout.tsx
+
+Overlays (dropdowns/menus) are fixed-position and layout-independent
+
+Pages do not own global controls anymore
+
+Let me know if you want this converted into the README Recent Additions or Developer Onboarding Changelog formats too.

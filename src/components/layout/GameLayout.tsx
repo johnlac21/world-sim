@@ -1,7 +1,7 @@
 // src/components/layout/GameLayout.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 
@@ -32,7 +32,33 @@ export function GameLayout({ children }: Props) {
   const [simLoading, setSimLoading] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
 
-  // Fetch world summary for header + worldId
+  const [simMenuOpen, setSimMenuOpen] = useState(false);
+  const [simMenuPos, setSimMenuPos] = useState<{ top: number; left: number } | null>(null);
+
+  const simButtonRef = useRef<HTMLDivElement | null>(null);
+  const simMenuRef = useRef<HTMLDivElement | null>(null);
+
+  // Close Sim menu when clicking outside
+  useEffect(() => {
+    if (!simMenuOpen) return;
+
+    function handleClickOutside(event: MouseEvent) {
+      const target = event.target as Node;
+      if (
+        simMenuRef.current &&
+        !simMenuRef.current.contains(target) &&
+        simButtonRef.current &&
+        !simButtonRef.current.contains(target)
+      ) {
+        setSimMenuOpen(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [simMenuOpen]);
+
+  // Fetch world summary
   useEffect(() => {
     let cancelled = false;
 
@@ -41,11 +67,7 @@ export function GameLayout({ children }: Props) {
         setLoadingWorld(true);
         const res = await fetch('/api/world');
         if (!res.ok) return;
-        const json = (await res.json()) as {
-          id: number;
-          name: string;
-          currentYear: number;
-        };
+        const json = (await res.json()) as WorldSummary;
         if (!cancelled) {
           setWorld({
             id: json.id,
@@ -54,7 +76,7 @@ export function GameLayout({ children }: Props) {
           });
         }
       } catch {
-        // fail silently; header will just be generic
+        // ignore
       } finally {
         if (!cancelled) setLoadingWorld(false);
       }
@@ -66,7 +88,7 @@ export function GameLayout({ children }: Props) {
     };
   }, []);
 
-  // Fetch player-country summary so we can build country nav links
+  // Fetch player-country summary
   useEffect(() => {
     let cancelled = false;
 
@@ -74,11 +96,7 @@ export function GameLayout({ children }: Props) {
       try {
         const res = await fetch('/api/player-country');
         if (!res.ok) return;
-        const json = (await res.json()) as {
-          name: string;
-          worldId: number;
-          countryId: number;
-        };
+        const json = (await res.json()) as PlayerCountrySummary;
         if (!cancelled) {
           setPlayerCountry({
             name: json.name,
@@ -87,7 +105,7 @@ export function GameLayout({ children }: Props) {
           });
         }
       } catch {
-        // ignore; nav still works with generic links
+        // ignore
       }
     }
 
@@ -109,7 +127,6 @@ export function GameLayout({ children }: Props) {
     try {
       setSimLoading(true);
       await fetch('/api/sim/year', { method: 'POST' });
-      // full reload so all pages refetch
       window.location.reload();
     } finally {
       setSimLoading(false);
@@ -131,67 +148,135 @@ export function GameLayout({ children }: Props) {
     }
   };
 
+  const toggleSimMenu = () => {
+    if (simMenuOpen) {
+      setSimMenuOpen(false);
+      return;
+    }
+
+    if (simButtonRef.current) {
+      const rect = simButtonRef.current.getBoundingClientRect();
+      setSimMenuPos({
+        top: rect.bottom, // pixel position in viewport
+        left: rect.left,
+      });
+    }
+    setSimMenuOpen(true);
+  };
+
   return (
     <div className="min-h-screen bg-[#f2f2f2] text-[#222222]">
       {/* Top navigation bar */}
-      <header className="flex h-12 items-center justify-between border-b border-gray-200 bg-white px-3 md:px-4">
-        {/* Left: logo + title */}
-        <div className="flex items-center gap-2">
-          <Link href="/" className="flex items-center gap-1">
-            <span className="text-lg">🌍</span>
-            <span className="text-sm font-semibold tracking-tight">
-              World Sim BBGM
-            </span>
-          </Link>
-        </div>
+      <header className="border-b border-gray-200 bg-white">
+        <div className="flex h-12 items-center px-3 md:px-4">
+          {/* LEFT: logo + title + Sim dropdown */}
+          <div className="flex items-center gap-3">
+            <Link href="/" className="flex items-center gap-1">
+              <span className="text-lg">🌍</span>
+              <span className="text-sm font-semibold tracking-tight">
+                World Sim BBGM
+              </span>
+            </Link>
 
-        {/* Center: world name + year */}
-        <div className="hidden items-baseline gap-2 text-xs text-gray-600 md:flex">
-          {world ? (
-            <>
-              <span className="font-medium">{world.name}</span>
-              <span>· Year {world.currentYear}</span>
-            </>
-          ) : loadingWorld ? (
-            <span className="italic text-gray-400">Loading world…</span>
-          ) : (
-            <span className="italic text-gray-400">World overview</span>
-          )}
-        </div>
+            <div ref={simButtonRef}>
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={toggleSimMenu}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    toggleSimMenu();
+                  }
+                }}
+                className="cursor-pointer text-[12px] font-semibold"
+                style={{
+                  backgroundColor: '#16a34a', // green-600
+                  color: '#ffffff',
+                  borderRadius: 4,
+                  padding: '0.35rem 0.75rem',
+                  border: '1px solid #15803d', // darker green
+                  height: '28px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  lineHeight: 1.2,
+                }}
+              >
+                Sim
+                <span className="ml-1 text-[10px]">▾</span>
+              </div>
+            </div>
+          </div>
 
-        {/* Right: sim/reset + player link + search icon */}
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleSimOneYear}
-            disabled={simLoading}
-            className="hidden items-center rounded border border-gray-300 bg-white px-2 py-1 text-[11px] font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60 sm:inline-flex"
-          >
-            {simLoading ? 'Sim…' : 'Sim 1 Year'}
-          </button>
-          <button
-            onClick={handleResetWorld}
-            disabled={resetLoading}
-            className="hidden items-center rounded border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-medium text-red-700 hover:bg-red-100 disabled:opacity-60 sm:inline-flex"
-          >
-            {resetLoading ? 'Resetting…' : 'Reset World'}
-          </button>
+          {/* CENTER: world name + year */}
+          <div className="flex flex-1 items-center justify-center text-xs text-gray-600">
+            {world ? (
+              <>
+                <span className="font-medium">{world.name}</span>
+                <span className="ml-1">· Year {world.currentYear}</span>
+              </>
+            ) : loadingWorld ? (
+              <span className="italic text-gray-400">Loading world…</span>
+            ) : (
+              <span className="italic text-gray-400">World overview</span>
+            )}
+          </div>
 
-          <Link
-            href="/player"
-            className="inline-flex items-center rounded bg-blue-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-blue-700"
-          >
-            My Country
-          </Link>
+          {/* RIGHT: My Country + search */}
+          <div className="flex items-center gap-2">
+            <Link
+              href="/player"
+              className="inline-flex items-center rounded bg-blue-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-blue-700"
+            >
+              My Country
+            </Link>
 
-          <button
-            type="button"
-            className="ml-1 inline-flex h-7 w-7 items-center justify-center rounded-full border border-gray-300 bg-white text-xs text-gray-600 hover:bg-gray-50"
-            title="Global search (people/companies)"
-          >
-            🔍
-          </button>
+            <button
+              type="button"
+              className="ml-1 inline-flex h-7 w-7 items-center justify-center rounded-full border border-gray-300 bg-white text-xs text-gray-600 hover:bg-gray-50"
+              title="Global search (people/companies)"
+            >
+              🔍
+            </button>
+          </div>
         </div>
       </header>
+
+      {/* Sim dropdown: FIXED, so it never changes header layout */}
+      {simMenuOpen && simMenuPos && (
+        <div
+          ref={simMenuRef}
+          className="fixed w-44 rounded border border-gray-200 bg-white text-[12px] shadow-lg"
+          style={{
+            top: simMenuPos.top,
+            left: simMenuPos.left,
+            zIndex: 1000,
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => {
+              setSimMenuOpen(false);
+              handleSimOneYear();
+            }}
+            disabled={simLoading}
+            className="block w-full px-3 py-1.5 text-left hover:bg-gray-50 disabled:opacity-60"
+          >
+            {simLoading ? 'Sim…' : 'Sim 1 year'}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setSimMenuOpen(false);
+              handleResetWorld();
+            }}
+            disabled={resetLoading}
+            className="block w-full px-3 py-1.5 text-left text-red-700 hover:bg-red-50 disabled:opacity-60"
+          >
+            {resetLoading ? 'Resetting…' : 'Reset world'}
+          </button>
+        </div>
+      )}
 
       {/* Below: sidebar + main content */}
       <div className="flex">
@@ -268,8 +353,7 @@ export function GameLayout({ children }: Props) {
         </aside>
 
         {/* Main content area */}
-        <main className="flex-1 min-h-[calc(100vh-3rem)] bg-[#f2f2f2]">
-          {/* Centered white sheet like BBGM */}
+        <main className="min-h-[calc(100vh-3rem)] flex-1 bg-[#f2f2f2]">
           <div className="mx-auto max-w-6xl border-x border-gray-200 bg-white px-3 py-3 md:px-4 md:py-4">
             {children}
           </div>
