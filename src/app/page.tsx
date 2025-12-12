@@ -1,516 +1,843 @@
-// src/app/page.tsx
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { SectionHeader } from '@/components/ui/SectionHeader';
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { CountryCrest } from "@/components/ui/CountryCrest";
 
-type WorldSummary = {
+type WorldSummaryPerson = {
+  id: number;
+  name: string;
+  age: number;
+  countryId: number;
+  countryName: string;
+};
+
+type WorldSummaryResponse = {
   id: number;
   name: string;
   currentYear: number;
-  countriesCount?: number;
+  countriesCount: number;
   peopleCount: number;
+
+  // backend might use either name
+  companyCount?: number;
   companiesCount?: number;
-  countries?: { id: number; name: string }[];
-  samplePeople?: {
-    id: number;
-    name: string;
-    age: number;
-    countryId: number;
-    isAlive: boolean;
-  }[];
+
+  samplePeople: WorldSummaryPerson[] | null;
 };
 
-type StandingRow = {
+type CountryHistoryEntry = {
+  year: number;
+  totalScore: number;
+  rank: number;
+  isChampion: boolean;
+};
+
+type CountryStanding = {
   countryId: number;
   countryName: string;
   currentRank: number;
   lastYearRank: number | null;
-  trend: 'up' | 'down' | 'same' | 'new';
+  trend: "up" | "down" | "same" | "new";
   totalScore: number;
+  companyScore: number;
+  governmentScore: number;
+  populationScore: number;
+  history: CountryHistoryEntry[] | null;
 };
 
-type TopCompanyRow = {
-  companyId: number;
-  name: string;
-  industry: string;
+type StandingsResponse = {
+  worldId: number;
+  year: number;
+  playerCountryId: number | null;
+  countries: CountryStanding[];
+};
+
+type TopCompany = {
+  companyId?: number; // some APIs might just use "id"
+  id?: number;
+
+  companyName?: string;
+  name?: string;
+
   countryId: number;
-  countryName: string;
+  countryName?: string;
+  country?: string;
+
+  industry: string;
   outputScore: number;
 };
 
-export default function HomePage() {
-  const [world, setWorld] = useState<WorldSummary | null>(null);
-  const [loadingWorld, setLoadingWorld] = useState(false);
+type TopCompaniesResponse = {
+  worldId: number;
+  year: number;
+  companies: TopCompany[];
+};
 
-  const [standings, setStandings] = useState<StandingRow[]>([]);
-  const [loadingStandings, setLoadingStandings] = useState(false);
+type Headline = {
+  id: string;
+  title: string;
+  subtitle: string;
+};
 
-  const [topCompanies, setTopCompanies] = useState<TopCompanyRow[]>([]);
-  const [loadingTopCompanies, setLoadingTopCompanies] = useState(false);
+type TopPerson = {
+  id: number;
+  name: string;
+  age: number;
+  countryId: number;
+  countryName: string;
+  contributionScore?: number; // optional; falls back to sample people
+};
 
-  const [simulating, setSimulating] = useState(false);
-  const [resetting, setResetting] = useState(false);
+export default function WorldOverviewPage() {
+  const router = useRouter();
 
-  // ---------- data loaders --------------------------------------------------
+  const [world, setWorld] = useState<WorldSummaryResponse | null>(null);
+  const [standings, setStandings] = useState<StandingsResponse | null>(null);
+  const [topCompanies, setTopCompanies] = useState<TopCompany[]>([]);
+  const [topPeople, setTopPeople] = useState<TopPerson[]>([]);
+  const [headlines, setHeadlines] = useState<Headline[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const loadWorld = async () => {
-    setLoadingWorld(true);
-    try {
-      const res = await fetch('/api/world');
-      const data = (await res.json()) as WorldSummary;
-      setWorld(data);
-      return data;
-    } catch (err) {
-      console.error('[Home] Failed to load world:', err);
-      setWorld(null);
-      return null;
-    } finally {
-      setLoadingWorld(false);
-    }
-  };
-
-  const loadStandings = async (worldId: number) => {
-    setLoadingStandings(true);
-    try {
-      const res = await fetch(`/api/world/${worldId}/standings`);
-      if (!res.ok) throw new Error('standings request failed');
-      const json = await res.json();
-      setStandings(json.standings ?? []);
-    } catch (err) {
-      console.error('[Home] Failed to load standings:', err);
-      setStandings([]);
-    } finally {
-      setLoadingStandings(false);
-    }
-  };
-
-  const loadTopCompanies = async (worldId: number) => {
-    setLoadingTopCompanies(true);
-    try {
-      const res = await fetch(`/api/world/${worldId}/top-companies`);
-      if (!res.ok) throw new Error('top companies request failed');
-      const json = await res.json();
-      setTopCompanies(json.companies ?? []);
-    } catch (err) {
-      console.error('[Home] Failed to load top companies:', err);
-      setTopCompanies([]);
-    } finally {
-      setLoadingTopCompanies(false);
-    }
-  };
-
+  // --- Load world summary first (/api/world) -------------------------
   useEffect(() => {
-    (async () => {
-      const w = await loadWorld();
-      if (w && w.id) {
-        void loadStandings(w.id);
-        void loadTopCompanies(w.id);
+    let cancelled = false;
+
+    async function loadWorld() {
+      try {
+        setLoading(true);
+        const res = await fetch("/api/world");
+        if (!res.ok) {
+          throw new Error(`World load failed (${res.status})`);
+        }
+        const json = (await res.json()) as WorldSummaryResponse;
+        if (!cancelled) {
+          setWorld(json);
+        }
+      } catch (err: any) {
+        if (!cancelled) {
+          setError(err?.message ?? "Failed to load world");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
-    })();
+    }
+
+    loadWorld();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const reloadAll = async () => {
-    const w = await loadWorld();
-    if (w && w.id) {
-      void loadStandings(w.id);
-      void loadTopCompanies(w.id);
+  // --- Once we know worldId, load standings + top companies ----------
+  useEffect(() => {
+    if (!world) return;
+
+    let cancelled = false;
+
+    async function loadSecondary() {
+      try {
+        setLoading(true);
+
+        const [standingsRes, topCompaniesRes] = await Promise.all([
+          fetch(`/api/world/${world.id}/standings`),
+          fetch(`/api/world/${world.id}/top-companies`),
+        ]);
+
+        if (!standingsRes.ok) {
+          throw new Error(`Standings load failed (${standingsRes.status})`);
+        }
+        if (!topCompaniesRes.ok) {
+          throw new Error(`Top companies load failed (${topCompaniesRes.status})`);
+        }
+
+        const standingsJson = (await standingsRes.json()) as StandingsResponse;
+        const topCompaniesJson =
+          (await topCompaniesRes.json()) as TopCompaniesResponse;
+
+        if (cancelled) return;
+
+        setStandings(standingsJson);
+
+        const companies = topCompaniesJson.companies ?? [];
+        setTopCompanies(companies);
+
+        // derive topPeople from samplePeople (fallback)
+        const ppl = Array.isArray(world.samplePeople) ? world.samplePeople : [];
+        const derivedTopPeople: TopPerson[] = ppl
+          .slice()
+          .sort((a, b) => a.age - b.age) // arbitrary but deterministic
+          .slice(0, 10)
+          .map((p) => ({
+            id: p.id,
+            name: p.name,
+            age: p.age,
+            countryId: p.countryId,
+            countryName: p.countryName,
+          }));
+        setTopPeople(derivedTopPeople);
+
+        const standingsCountries = getStandingsCountriesFromAny(standingsJson);
+
+        setHeadlines(
+          buildHeadlines(world, standingsCountries, standingsJson.year, companies)
+        );
+      } catch (err: any) {
+        if (!cancelled) {
+          setError(err?.message ?? "Failed to load world data");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
     }
-  };
 
-  // ---------- sim + reset ---------------------------------------------------
+    loadSecondary();
+    return () => {
+      cancelled = true;
+    };
+  }, [world]);
 
-  const handleSimYear = async () => {
-    setSimulating(true);
+  // --- Actions -------------------------------------------------------
+  async function handleSimYear() {
     try {
-      await fetch('/api/sim/year', { method: 'POST' });
-      await reloadAll();
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setSimulating(false);
+      await fetch("/api/sim/year", { method: "POST" });
+      window.location.reload();
+    } catch {
+      // swallow; this is a convenience control
     }
-  };
-
-  const handleResetWorld = async () => {
-    if (!confirm('Reset world? This will delete and regenerate everything.')) {
-      return;
-    }
-    setResetting(true);
-    try {
-      await fetch('/api/world/reset', { method: 'POST' });
-      await reloadAll();
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setResetting(false);
-    }
-  };
-
-  // ---------- loading guards ------------------------------------------------
-
-  if (loadingWorld && !world) {
-    return <main className="px-3 py-4 md:px-4">Loading world…</main>;
   }
+
+  async function handleResetWorld() {
+    if (!window.confirm("Reset world and lose all history?")) return;
+    try {
+      await fetch("/api/world/reset", { method: "POST" });
+      window.location.reload();
+    } catch {
+      // swallow
+    }
+  }
+
+  function handleGoToPlayer() {
+    router.push("/player");
+  }
+
+  // --- Derived helpers -----------------------------------------------
+  const standingsCountries: CountryStanding[] =
+    getStandingsCountriesFromAny(standings);
+
+  const miniStandings = standingsCountries
+    .slice()
+    .sort((a, b) => a.currentRank - b.currentRank)
+    .slice(0, 10);
+
+  const topCountries = standingsCountries
+    .slice()
+    .sort((a, b) => a.currentRank - b.currentRank)
+    .slice(0, 5);
+
+  const worldStats = computeWorldStats(
+    standingsCountries,
+    standings?.year ?? null
+  );
+
+  // --- Render --------------------------------------------------------
+  if (loading && !world && !standings) {
+    return (
+      <div className="max-w-6xl mx-auto px-4 py-4 text-xs text-gray-600">
+        Loading world…
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-6xl mx-auto px-4 py-4 text-xs text-red-600">
+        Error loading world: {error}
+      </div>
+    );
+  }
+
   if (!world) {
-    return <main className="px-3 py-4 md:px-4">No world found.</main>;
+    return (
+      <div className="max-w-6xl mx-auto px-4 py-4 text-xs text-gray-600">
+        No world found. Try resetting the world from the top nav.
+      </div>
+    );
   }
 
-  const countries = world.countries ?? [];
-  const samplePeople = world.samplePeople ?? [];
-  const miniStandings = standings.slice(0, 8);
-
-  // tiny headline generation
-  const headlines: { id: string; title: string; body: string; href?: string }[] =
-    [];
-
-  if (standings.length > 0) {
-    const champion = standings[0];
-    headlines.push({
-      id: 'champion',
-      title: `${champion.countryName} on top`,
-      body: `Currently ranked #${champion.currentRank} with total score ${champion.totalScore.toFixed(
-        0,
-      )}.`,
-      href: `/country/${champion.countryId}`,
-    });
-  }
-
-  if (topCompanies.length > 0) {
-    const best = topCompanies[0];
-    headlines.push({
-      id: 'top-company',
-      title: `${best.name} leads ${best.industry}`,
-      body: `Top company this year with outputScore ${best.outputScore.toFixed(
-        0,
-      )} (${best.countryName}).`,
-      href: `/company/${best.companyId}`,
-    });
-  }
-
-  if (samplePeople.length > 0) {
-    const notable = samplePeople[0];
-    headlines.push({
-      id: 'notable-person',
-      title: `${notable.name} in the spotlight`,
-      body: `Age ${notable.age} from countryId ${notable.countryId}${
-        !notable.isAlive ? ' (retired / deceased)' : ''
-      }.`,
-      href: `/person/${notable.id}`,
-    });
-  }
-
-  const trendSymbol = (t: StandingRow['trend']) =>
-    t === 'up' ? '↑' : t === 'down' ? '↓' : t === 'same' ? '→' : '★';
-
-  // ---------- render --------------------------------------------------------
+  // derive a safe company count from whichever field the API actually uses
+  const companyCount = world.companyCount ?? world.companiesCount ?? 0;
 
   return (
-    <main className="px-3 py-4 md:px-4 md:py-6">
-      <SectionHeader
-        eyebrow="World overview"
-        title={world.name}
-        description={`Year ${world.currentYear} · Countries: ${
-          world.countriesCount ?? countries.length
-        } · Total people: ${world.peopleCount}${
-          world.companiesCount != null ? ` · Companies: ${world.companiesCount}` : ''
-        }`}
-      />
+    <div className="max-w-6xl mx-auto px-4 py-4 text-xs">
+      {/* Page header – mirrors BBGM league header */}
+      <h1 className="text-lg font-semibold mb-1">{world.name}</h1>
+      <p className="text-[11px] text-gray-600 mb-3">
+        Year {world.currentYear} · Countries: {world.countriesCount} · People:{" "}
+        {world.peopleCount.toLocaleString()} · Companies:{" "}
+        {companyCount.toLocaleString()}
+      </p>
 
-      {/* BBGM-style flat layout: single "sheet" with three columns */}
-      <div className="grid gap-6 md:grid-cols-12 text-[13px]">
-        {/* LEFT COLUMN ------------------------------------------------------ */}
-        <section className="md:col-span-3 space-y-6">
-          {/* Mini standings */}
-          <div>
-            <div className="mb-1 flex items-baseline justify-between">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-600">
-                Mini standings
+      {/* World-level controls (these duplicate top-nav but are very BBGM-ish) */}
+      <div className="mb-4 flex flex-wrap gap-2">
+        <button
+          onClick={handleSimYear}
+          className="px-2 py-1 border border-gray-300 rounded text-[11px] hover:bg-gray-100"
+        >
+          Sim 1 Year
+        </button>
+        <button
+          onClick={handleResetWorld}
+          className="px-2 py-1 border border-red-300 text-red-700 rounded text-[11px] hover:bg-red-50"
+        >
+          Reset World
+        </button>
+        <button
+          onClick={handleGoToPlayer}
+          className="px-2 py-1 border border-blue-400 text-blue-700 rounded text-[11px] hover:bg-blue-50"
+        >
+          My Country
+        </button>
+      </div>
+
+      {/* 3-column BBGM layout */}
+      <div className="grid grid-cols-12 gap-4">
+        {/* LEFT COLUMN – mini-standings + countries list */}
+        <div className="col-span-12 md:col-span-3 flex flex-col gap-4">
+          {/* Mini Standings – BBGM-style */}
+          <section>
+            <h2 className="text-[11px] font-semibold mb-1 uppercase tracking-wide text-gray-700">
+              Standings
+            </h2>
+            {miniStandings.length === 0 ? (
+              <p className="text-[11px] text-gray-500">No standings yet.</p>
+            ) : (
+              <div className="border border-gray-200 rounded-sm overflow-hidden">
+                <table className="w-full border-collapse text-[11px]">
+                  <thead>
+                    <tr className="bg-gray-100 border-b border-gray-200 text-gray-700">
+                      <th className="text-left pl-2 pr-1 py-1">Country</th>
+                      <th className="text-right pr-2 py-1 w-10">Score</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {miniStandings.map((c, index) => {
+                      const stripe = index % 2 === 0 ? "bg-white" : "bg-gray-50";
+                      return (
+                        <tr
+                          key={c.countryId}
+                          className={`${stripe} border-b border-gray-200 hover:bg-[#eef3ff]`}
+                        >
+                          <td className="text-left pl-2 pr-1 py-1.5 flex items-center gap-2">
+                            {/* rank */}
+                            <span className="font-semibold text-gray-900">
+                              {index + 1}
+                            </span>
+
+                            {/* crest */}
+                            <CountryCrest id={c.countryId} name={c.countryName} />
+
+                            {/* name */}
+                            <Link
+                              href={`/country/${c.countryId}`}
+                              className="text-blue-700 hover:underline"
+                            >
+                              {c.countryName}
+                            </Link>
+                          </td>
+
+                          <td className="text-right pr-2 py-1.5">
+                            {formatScore(c.totalScore)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+
+                  </tbody>
+                </table>
               </div>
+            )}
+            <div className="mt-1 text-[11px]">
               <Link
                 href={`/world/${world.id}/standings`}
-                className="text-[11px] font-medium text-blue-600 hover:underline"
+                className="text-blue-700 hover:underline"
               >
                 Full standings →
               </Link>
             </div>
-            <div className="text-[11px] text-gray-500 mb-1">
-              Year {world.currentYear}
-            </div>
+          </section>
 
-            {loadingStandings ? (
-              <p className="text-[11px] text-gray-500">Loading standings…</p>
-            ) : miniStandings.length === 0 ? (
-              <p className="text-[11px] text-gray-500">
-                No standings yet. Sim a year to populate.
-              </p>
-            ) : (
-              <table className="min-w-full border-collapse text-[12px]">
-                <thead className="border-b border-gray-300 text-[11px] uppercase tracking-wide text-gray-500">
-                  <tr>
-                    <th className="py-1 pr-2 text-right">#</th>
-                    <th className="py-1 px-2 text-left">Country</th>
-                    <th className="py-1 px-2 text-right">Score</th>
-                    <th className="py-1 pl-2 pr-1 text-center">Δ</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {miniStandings.map((row, idx) => (
-                    <tr
-                      key={row.countryId}
-                      className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}
-                    >
-                      <td className="py-1 pr-2 text-right">{row.currentRank}</td>
-                      <td className="py-1 px-2">
-                        <Link
-                          href={`/country/${row.countryId}`}
-                          className="text-blue-600 hover:underline"
-                        >
-                          {row.countryName}
-                        </Link>
-                      </td>
-                      <td className="py-1 px-2 text-right">
-                        {row.totalScore.toFixed(0)}
-                      </td>
-                      <td className="py-1 pl-2 pr-1 text-center text-[11px]">
-                        <span
-                          className={
-                            row.trend === 'up'
-                              ? 'text-green-600'
-                              : row.trend === 'down'
-                              ? 'text-red-600'
-                              : 'text-gray-500'
-                          }
-                        >
-                          {trendSymbol(row.trend)}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
 
           {/* Countries list */}
-          <div>
-            <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-600">
+          <section>
+            <h2 className="text-[11px] font-semibold mb-1 uppercase tracking-wide text-gray-700">
               Countries
-            </div>
-            {countries.length === 0 ? (
+            </h2>
+            {miniStandings.length === 0 ? (
               <p className="text-[11px] text-gray-500">
-                No countries in this world yet.
+                Standings will populate after the first simulated year.
               </p>
             ) : (
-              <ul className="ml-4 list-disc space-y-0.5 text-[12px]">
-                {countries.map((c) => (
-                  <li key={c.id}>
+              <ul className="list-disc pl-4 space-y-[1px]">
+                {miniStandings.map((c) => (
+                  <li key={`list-${c.countryId}`}>
                     <Link
-                      href={`/country/${c.id}`}
-                      className="text-blue-600 hover:underline"
+                      href={`/country/${c.countryId}`}
+                      className="text-blue-700 hover:underline"
                     >
-                      {c.name}
+                      {c.countryName}
                     </Link>
                   </li>
                 ))}
               </ul>
             )}
-          </div>
-        </section>
+          </section>
+        </div>
 
-        {/* CENTER COLUMN ----------------------------------------------------- */}
-        <section className="md:col-span-6 space-y-6">
+        {/* CENTER COLUMN – world snapshot, top countries, world stats, top companies */}
+        <div className="col-span-12 md:col-span-6 flex flex-col gap-4">
           {/* World snapshot */}
-          <div>
-            <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-600">
+          <section>
+            <h2 className="text-[11px] font-semibold mb-1 text-gray-800">
               World snapshot
-            </div>
-            <div className="grid grid-cols-2 gap-y-1 gap-x-6 md:grid-cols-4 text-[12px]">
+            </h2>
+            <div className="grid grid-cols-4 gap-2 text-[11px]">
               <div>
                 <div className="text-gray-500">Year</div>
-                <div className="font-semibold text-gray-900">
-                  {world.currentYear}
-                </div>
+                <div className="font-semibold">{world.currentYear}</div>
               </div>
               <div>
                 <div className="text-gray-500">Countries</div>
-                <div className="font-semibold text-gray-900">
-                  {world.countriesCount ?? countries.length}
-                </div>
+                <div className="font-semibold">{world.countriesCount}</div>
               </div>
               <div>
                 <div className="text-gray-500">People</div>
-                <div className="font-semibold text-gray-900">
+                <div className="font-semibold">
                   {world.peopleCount.toLocaleString()}
                 </div>
               </div>
-              {world.companiesCount != null && (
-                <div>
-                  <div className="text-gray-500">Companies</div>
-                  <div className="font-semibold text-gray-900">
-                    {world.companiesCount}
-                  </div>
+              <div>
+                <div className="text-gray-500">Companies</div>
+                <div className="font-semibold">
+                  {companyCount.toLocaleString()}
                 </div>
-              )}
+              </div>
             </div>
-            <div className="mt-3 flex flex-wrap gap-2 text-[11px]">
-              <button
-                onClick={handleSimYear}
-                disabled={simulating}
-                className="rounded border border-gray-300 bg-white px-2 py-1 font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
-              >
-                {simulating ? 'Simulating…' : 'Sim 1 year'}
-              </button>
-              <button
-                onClick={handleResetWorld}
-                disabled={resetting}
-                className="rounded border border-red-200 bg-red-50 px-2 py-1 font-medium text-red-700 hover:bg-red-100 disabled:opacity-50"
-              >
-                {resetting ? 'Resetting…' : 'Reset world'}
-              </button>
-              <Link
-                href="/player"
-                className="rounded bg-blue-600 px-2 py-1 font-semibold text-white hover:bg-blue-700"
-              >
-                My country dashboard
-              </Link>
-            </div>
-          </div>
+          </section>
 
-          {/* Top companies table */}
-          <div>
-            <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-600">
-              Top companies this year
-            </div>
-            <div className="mb-1 text-[11px] text-gray-500">
-              League leaders by outputScore
-            </div>
-
-            {loadingTopCompanies ? (
+          {/* Top countries this year – mirrors "Team Leaders" block */}
+          <section>
+            <h2 className="text-[11px] font-semibold mb-1 text-gray-800">
+              Top countries this year
+            </h2>
+            {topCountries.length === 0 ? (
               <p className="text-[11px] text-gray-500">
-                Loading top companies…
-              </p>
-            ) : topCompanies.length === 0 ? (
-              <p className="text-[11px] text-gray-500">
-                No company performance yet. Sim a year to generate scores.
+                Sim a year to generate country performance.
               </p>
             ) : (
-              <table className="min-w-full border-collapse text-[12px]">
-                <thead className="border-b border-gray-300 text-[11px] uppercase tracking-wide text-gray-500">
-                  <tr>
-                    <th className="py-1 pr-2 text-right">#</th>
-                    <th className="py-1 px-2 text-left">Company</th>
-                    <th className="py-1 px-2 text-left">Country</th>
-                    <th className="py-1 px-2 text-left">Industry</th>
-                    <th className="py-1 pl-2 pr-1 text-right">Output</th>
+              <table className="w-full border-collapse text-[11px]">
+                <thead>
+                  <tr className="border-b border-gray-200 text-gray-600">
+                    <th className="text-left pr-1 py-1 w-4">#</th>
+                    <th className="text-left pr-1 py-1">Country</th>
+                    <th className="text-right pr-1 py-1">Total</th>
+                    <th className="text-right pr-1 py-1">Company</th>
+                    <th className="text-right pr-1 py-1">Gov</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {topCompanies.map((c, idx) => (
+                  {topCountries.map((c) => (
                     <tr
-                      key={c.companyId}
-                      className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}
+                      key={`top-country-${c.countryId}`}
+                      className="border-b border-gray-100 hover:bg-[#eef3ff]"
                     >
-                      <td className="py-1 pr-2 text-right">{idx + 1}</td>
-                      <td className="py-1 px-2">
-                        <Link
-                          href={`/company/${c.companyId}`}
-                          className="text-blue-600 hover:underline"
-                        >
-                          {c.name}
-                        </Link>
-                      </td>
-                      <td className="py-1 px-2">
+                      <td className="text-left pr-1 py-[3px]">{c.currentRank}</td>
+                      <td className="text-left pr-1 py-[3px]">
                         <Link
                           href={`/country/${c.countryId}`}
-                          className="text-blue-600 hover:underline"
+                          className="text-blue-700 hover:underline"
                         >
                           {c.countryName}
                         </Link>
                       </td>
-                      <td className="py-1 px-2">{c.industry}</td>
-                      <td className="py-1 pl-2 pr-1 text-right">
-                        {c.outputScore.toFixed(0)}
+                      <td className="text-right pr-1 py-[3px]">
+                        {formatScore(c.totalScore)}
+                      </td>
+                      <td className="text-right pr-1 py-[3px]">
+                        {formatScore(c.companyScore)}
+                      </td>
+                      <td className="text-right pr-1 py-[3px]">
+                        {formatScore(c.governmentScore)}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             )}
-          </div>
-        </section>
+          </section>
 
-        {/* RIGHT COLUMN ------------------------------------------------------ */}
-        <section className="md:col-span-3 space-y-6">
+          {/* World stats block – BBGM-style "Team Stats" analogue */}
+          <section>
+            <h2 className="text-[11px] font-semibold mb-1 text-gray-800">
+              World stats
+            </h2>
+            {worldStats ? (
+              <div className="grid grid-cols-2 gap-2 text-[11px]">
+                <div>
+                  <div className="text-gray-500">Average company output</div>
+                  <div className="font-semibold">
+                    {worldStats.avgCompanyOutput.toFixed(1)}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-gray-500">Champion (last year)</div>
+                  <div className="font-semibold">
+                    {worldStats.lastChampionName ?? "—"}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-gray-500">Best gov score</div>
+                  <div className="font-semibold">
+                    {worldStats.bestGovernmentScoreName
+                      ? `${worldStats.bestGovernmentScoreName} (${Math.round(
+                          worldStats.bestGovernmentScoreValue
+                        )})`
+                      : "—"}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-gray-500">
+                    Countries with &gt;0 gov score
+                  </div>
+                  <div className="font-semibold">
+                    {worldStats.countriesWithGovScore}/
+                    {worldStats.totalCountries}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <p className="text-[11px] text-gray-500">
+                World stats will appear after the first simulated season.
+              </p>
+            )}
+          </section>
+
+          {/* Top companies this year – mirrors BBGM "League Leaders" */}
+          <section>
+            <h2 className="text-[11px] font-semibold mb-1 text-gray-800">
+              Top companies this year
+            </h2>
+            {topCompanies.length === 0 ? (
+              <p className="text-[11px] text-gray-500">
+                Sim a year to generate company performance.
+              </p>
+            ) : (
+              <table className="w-full border-collapse text-[11px]">
+                <thead>
+                  <tr className="border-b border-gray-200 text-gray-600">
+                    <th className="text-left pr-1 py-1 w-4">#</th>
+                    <th className="text-left pr-1 py-1">Company</th>
+                    <th className="text-left pr-1 py-1">Country</th>
+                    <th className="text-left pr-1 py-1">Industry</th>
+                    <th className="text-right pr-1 py-1">Output</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {topCompanies.slice(0, 10).map((c, index) => {
+                    const companyId = c.companyId ?? c.id ?? index;
+                    const companyName = c.companyName ?? c.name ?? "Unknown";
+                    const countryName = c.countryName ?? c.country ?? "Unknown";
+                    return (
+                      <tr
+                        key={companyId}
+                        className="border-b border-gray-100 hover:bg-[#eef3ff]"
+                      >
+                        <td className="text-left pr-1 py-[3px]">{index + 1}</td>
+                        <td className="text-left pr-1 py-[3px]">
+                          <Link
+                            href={`/company/${companyId}`}
+                            className="text-blue-700 hover:underline"
+                          >
+                            {companyName}
+                          </Link>
+                        </td>
+                        <td className="text-left pr-1 py-[3px]">
+                          <Link
+                            href={`/country/${c.countryId}`}
+                            className="text-blue-700 hover:underline"
+                          >
+                            {countryName}
+                          </Link>
+                        </td>
+                        <td className="text-left pr-1 py-[3px]">
+                          {c.industry}
+                        </td>
+                        <td className="text-right pr-1 py-[3px]">
+                          {formatScore(c.outputScore)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </section>
+        </div>
+
+        {/* RIGHT COLUMN – headlines + top people */}
+        <div className="col-span-12 md:col-span-3 flex flex-col gap-4">
           {/* League headlines */}
-          <div>
-            <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-600">
+          <section>
+            <h2 className="text-[11px] font-semibold mb-1 text-gray-800">
               League headlines
-            </div>
-            <div className="text-[11px] text-gray-500 mb-1">
-              Quick story of the current season
-            </div>
+            </h2>
             {headlines.length === 0 ? (
               <p className="text-[11px] text-gray-500">
-                No major stories yet. Sim a few years and check back.
+                Sim a year to generate headlines.
               </p>
             ) : (
               <div className="space-y-2">
                 {headlines.map((h) => (
                   <div
                     key={h.id}
-                    className="border border-gray-200 bg-white px-2 py-2 text-[12px]"
+                    className="border border-gray-200 rounded px-2 py-1.5 text-[11px] bg-white"
                   >
-                    <div className="font-semibold text-gray-900">
-                      {h.href ? (
-                        <Link
-                          href={h.href}
-                          className="text-blue-700 hover:underline"
-                        >
-                          {h.title}
-                        </Link>
-                      ) : (
-                        h.title
-                      )}
+                    <div className="font-semibold text-blue-800 mb-[1px]">
+                      {h.title}
                     </div>
-                    <div className="text-[11px] text-gray-600">
-                      {h.body}
+                    <div className="text-gray-600 leading-snug">
+                      {h.subtitle}
                     </div>
                   </div>
                 ))}
               </div>
             )}
-          </div>
+          </section>
 
-          {/* People sample */}
-          <div>
-            <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-600">
-              People (sample)
-            </div>
-            {samplePeople.length === 0 ? (
+          {/* Top people / sample */}
+          <section>
+            <h2 className="text-[11px] font-semibold mb-1 text-gray-800">
+              People (notable sample)
+            </h2>
+            {topPeople.length === 0 ? (
               <p className="text-[11px] text-gray-500">
-                No sample people loaded yet.
+                People sample will appear once the world is seeded.
               </p>
             ) : (
-              <ul className="ml-4 list-disc space-y-0.5 text-[12px]">
-                {samplePeople.map((p) => (
+              <ul className="space-y-[2px]">
+                {topPeople.map((p) => (
                   <li key={p.id}>
                     <Link
                       href={`/person/${p.id}`}
-                      className="text-blue-600 hover:underline"
+                      className="text-blue-700 hover:underline"
                     >
                       {p.name}
-                    </Link>{' '}
-                    — age {p.age} — countryId {p.countryId}
-                    {!p.isAlive && ' (dead)'}
+                    </Link>{" "}
+                    <span className="text-gray-600">
+                      — age {p.age} — country {p.countryName}
+                      {typeof p.contributionScore === "number"
+                        ? ` — contrib ${Math.round(p.contributionScore)}`
+                        : ""}
+                    </span>
                   </li>
                 ))}
               </ul>
             )}
-          </div>
-        </section>
+          </section>
+        </div>
       </div>
-    </main>
+    </div>
   );
+}
+
+// ------------------------------------------------------------------
+// Small helper components & functions
+// ------------------------------------------------------------------
+
+function TrendGlyph({ trend }: { trend: CountryStanding["trend"] }) {
+  if (trend === "up") {
+    return <span className="text-[10px] text-emerald-600">▲</span>;
+  }
+  if (trend === "down") {
+    return <span className="text-[10px] text-red-500">▼</span>;
+  }
+  if (trend === "new") {
+    return <span className="text-[10px] text-gray-500">•</span>;
+  }
+  return <span className="text-[10px] text-gray-400">–</span>;
+}
+
+function getStandingsCountriesFromAny(
+  raw: StandingsResponse | CountryStanding[] | null | undefined
+): CountryStanding[] {
+  if (!raw) return [];
+
+  if (Array.isArray(raw)) {
+    // API returned a bare array
+    return raw as CountryStanding[];
+  }
+
+  const anyRaw = raw as any;
+
+  if (Array.isArray(anyRaw.countries)) {
+    return anyRaw.countries as CountryStanding[];
+  }
+  if (Array.isArray(anyRaw.rows)) {
+    return anyRaw.rows as CountryStanding[];
+  }
+  if (Array.isArray(anyRaw.standings)) {
+    return anyRaw.standings as CountryStanding[];
+  }
+
+  return [];
+}
+
+function formatScore(value: unknown): string {
+  if (value == null) return "—";
+  const num =
+    typeof value === "number"
+      ? value
+      : Number(value);
+  if (!Number.isFinite(num)) return "—";
+  return Math.round(num).toString();
+}
+
+function computeWorldStats(
+  countries: CountryStanding[],
+  year: number | null
+):
+  | {
+      avgCompanyOutput: number;
+      lastChampionName: string | null;
+      bestGovernmentScoreName: string | null;
+      bestGovernmentScoreValue: number;
+      countriesWithGovScore: number;
+      totalCountries: number;
+    }
+  | null {
+  if (!countries || countries.length === 0) return null;
+
+  const totalCountries = countries.length;
+
+  // average company output based on companyScore (treat missing / NaN as 0)
+  const avgCompanyOutput =
+    countries.reduce((sum, c) => {
+      const raw = (c as any).companyScore;
+      const companyScore =
+        typeof raw === "number" && Number.isFinite(raw) ? raw : 0;
+      return sum + companyScore;
+    }, 0) / Math.max(1, totalCountries);
+
+  // last champion: look through history for champion in most recent year < current year
+  let lastChampionName: string | null = null;
+  let bestYear = -Infinity;
+  for (const c of countries) {
+    const history = c.history ?? [];
+    for (const h of history) {
+      if (
+        h.isChampion &&
+        h.year > bestYear &&
+        (year === null || h.year < year)
+      ) {
+        bestYear = h.year;
+        lastChampionName = c.countryName;
+      }
+    }
+  }
+
+  // best government score (handle missing / NaN)
+  let bestGovernmentScoreName: string | null = null;
+  let bestGovernmentScoreValue = -Infinity;
+  let countriesWithGovScore = 0;
+
+  for (const c of countries) {
+    const raw = (c as any).governmentScore;
+    const govScore =
+      typeof raw === "number" && Number.isFinite(raw) ? raw : 0;
+
+    if (govScore > 0) {
+      countriesWithGovScore += 1;
+    }
+    if (govScore > bestGovernmentScoreValue) {
+      bestGovernmentScoreValue = govScore;
+      bestGovernmentScoreName = c.countryName;
+    }
+  }
+
+  if (bestGovernmentScoreValue === -Infinity) {
+    bestGovernmentScoreValue = 0;
+    bestGovernmentScoreName = null;
+  }
+
+  return {
+    avgCompanyOutput,
+    lastChampionName,
+    bestGovernmentScoreName,
+    bestGovernmentScoreValue,
+    countriesWithGovScore,
+    totalCountries,
+  };
+}
+
+function buildHeadlines(
+  world: WorldSummaryResponse,
+  countries: CountryStanding[],
+  year: number | null,
+  topCompanies: TopCompany[]
+): Headline[] {
+  const result: Headline[] = [];
+
+  if (countries.length > 0 && year !== null) {
+    const sorted = [...countries].sort(
+      (a, b) => a.currentRank - b.currentRank
+    );
+    const top = sorted[0];
+
+    result.push({
+      id: "top-country",
+      title: `${top.countryName} on top`,
+      subtitle: `Currently ranked #1 in Year ${year} with total score ${formatScore(
+        top.totalScore
+      )}.`,
+    });
+
+    const last = sorted[sorted.length - 1];
+    result.push({
+      id: "bottom-country",
+      title: `${last.countryName} struggling`,
+      subtitle: `Ranked last (${last.currentRank}/${sorted.length}) in Year ${year}.`,
+    });
+  }
+
+  if (topCompanies.length > 0) {
+    const topCompany = topCompanies[0];
+    const cName =
+      topCompany.companyName ?? topCompany.name ?? "Unknown company";
+    const countryName =
+      topCompany.countryName ?? topCompany.country ?? "Unknown country";
+
+    result.push({
+      id: "top-company",
+      title: `${cName} leads ${topCompany.industry}`,
+      subtitle: `Top company this year with output score ${formatScore(
+        topCompany.outputScore
+      )} (${countryName}).`,
+    });
+  }
+
+  if (result.length === 0) {
+    result.push({
+      id: "seed",
+      title: "World seeded",
+      subtitle: `Sim a year to generate standings, headlines, and history for ${world.name}.`,
+    });
+  }
+
+  return result;
 }

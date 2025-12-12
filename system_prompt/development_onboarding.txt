@@ -2624,3 +2624,97 @@ Extended /api/person/[id] to include:
 and to materialize personYearPerformanceHistory, roleHistory, and officeHistory arrays for the client.
 Left column: grouped 24-stat attribute grid using STAT_LAYOUT + StatPill, plus a PersonYearPerformance bar chart and derived summary (seasons logged, peak contribution, industries played in).
 Right column: Quick Facts card, normalized employment and education tables (current + past), a role history table (company hierarchy roles), an office history table (political terms), and a cleaned-up relationships panel.
+
+UI Overhaul: BBGM “Single Sheet” Layout Integration
+
+Date: UI Modernization Sprint
+
+Summary:
+The UI migrated away from card-heavy layouts into a BBGM-inspired single-sheet structure. This consolidates major dashboard pages into a unified, dense information surface.
+
+Key Development Notes:
+
+Homepage (src/app/page.tsx) rewritten
+
+Uses grid-based 3-column BBGM dashboard
+
+All panels removed; replaced with flat sections + inline tables
+
+Typography tightened (12px body, 11px labels)
+
+GameLayout.tsx updated
+
+Added centered white sheet container around all page content
+
+Main content wrapper now: max-w-6xl, border-x, bg-white
+
+No cards or boxed layouts at the page level
+
+SectionHeader enhancements
+
+New props added:
+
+size?: "sm" | "md" | "lg"
+
+compact?: boolean
+
+Used for denser BBGM-style headers in dashboards
+
+Old default behavior unchanged (safe for existing pages)
+
+Panels deprecated for dashboards
+
+The default dashboard pattern is now:
+
+Heading → optional subtext → table or stat block
+
+Panels should be used only for special UI elements (e.g., headlines card)
+
+Table styling updates
+
+Row heights reduced
+
+Borders lightened
+
+Flat white background (no zebra by default on dashboards)
+
+Removed unnecessary padding
+
+UI Vision updated
+
+New rules: panel-minimalist, table-forward, single-sheet density model
+
+Dashboards, standings, company/person pages all adhere to BBGM structure
+
+Impact on Development:
+
+Future pages should follow the new sheet layout and avoid nested panels.
+
+New UI components should default to compact spacing and 12–13px fonts.
+
+Dashboard-style pages must use flat sections and table-first design unless a card is explicitly warranted.
+
+### Dec 2025 — Homepage UI Refactor & New UI Primitives
+
+1. **BBGM UI Pass:**
+   - Homepage redesigned to resemble Basketball GM’s main dashboard.
+   - Added zebra rows, header shading, hover behavior, and denser table visuals.
+
+2. **New UI Component: `CountryCrest`:**
+   - Deterministic pastel circle badge generated from countryId.
+   - Two-letter country mnemonic extracted from country name.
+   - Used in mini-standings; intended for reuse across the app (country pages, leaderboards, etc.)
+
+3. **New Utility Functions:**
+   - `formatScore(value)` — safely formats numbers; returns "—" instead of NaN.
+   - `countryColor(id)` — produces consistent pastel color for crests.
+   - `countryCode(name)` — generates country initials.
+   - `getStandingsCountriesFromAny(raw)` — flexible parser for variations of standings API responses.
+
+4. **Data Safety Improvements:**
+   - Eliminated NaN rendering errors arising from missing or null score fields.
+   - Added fallback logic for `companyCount` vs `companiesCount`.
+
+5. **Architecture Direction:**
+   - Identified need for shared UI components rather than page-level UI logic.
+   - Next steps: extract tables, headers, and panel structures into a Shared UI Components Library.

@@ -895,3 +895,36 @@ Key improvements include:
 - A PersonYearPerformance mini bar chart showing contributionScore by year, plus peak season and industry summary.
 - Structured employment and education history tables with current and past entries clearly separated.
 - New role and office history sections (company hierarchy roles and political terms), alongside a cleaned-up relationships panel.
+
+BBGM-Style UI Conversion (World Overview + Layout Update)
+
+Date: UI Sprint – BBGM Sheet Layout Adoption
+
+Converted / (world overview) to a BBGM-style single-sheet dashboard
+
+Removed panel/card layouts
+
+Adopted flat sections, dense tables, and compact typography
+
+Introduced a 3-column structure: mini standings, snapshot/top companies, headlines
+
+Updated global GameLayout to use a centered white content sheet with border-x
+
+Sidebar and top navigation remain, but spacing and font sizes now match BBGM density
+
+Added compact mode + sizing options to SectionHeader (size, compact)
+
+Updated tables to use a flat, dense BBGM look on the world overview page
+
+UI Vision Document revised to reflect new panel-minimalist, table-first, single-sheet design language
+
+### BBGM-Style Homepage UI Overhaul (Dec 2025)
+
+- Implemented a BBGM-inspired homepage layout with a 3-column grid (standings, world snapshot, stats, headlines).
+- Added zebra-striped tables, gray header bars, hover states, and score formatting for a more authentic BBGM visual identity.
+- Added safe numeric formatting via `formatScore()` to prevent NaN values from breaking the UI.
+- Introduced `CountryCrest` UI component (pastel circular badge with country initials) for use in standings and leaderboards.
+- Updated mini standings to use new BBGM-style table structure and crest icons.
+- Began structuring the future Shared UI Component Library (e.g., DataTable, SectionHeader, CountryCrest).
+- Improved robustness of data parsing with `getStandingsCountriesFromAny()` helper.
+- Fixed multiple runtime errors caused by optional fields (`companyScore`, `governmentScore`, etc.) and missing company count keys.
