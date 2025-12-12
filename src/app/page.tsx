@@ -1,9 +1,20 @@
+// src/app/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CountryCrest } from "@/components/ui/CountryCrest";
+
+import { formatScore } from "@/components/ui/formatScore";
+import { CountryStandingsMini } from "@/components/world/CountryStandingsMini";
+import { CountriesList } from "@/components/world/CountriesList";
+import { WorldSnapshotPanel } from "@/components/world/WorldSnapshotPanel";
+import { TopCountriesTable } from "@/components/world/TopCountriesTable";
+import { WorldStatsPanel } from "@/components/world/WorldStatsPanel";
+import { TopCompaniesTable } from "@/components/world/TopCompaniesTable";
+import { LeagueHeadlines } from "@/components/world/LeagueHeadlines";
+import { PeopleSampleList } from "@/components/world/PeopleSampleList";
+import type { WorldStats } from "@/components/world/types";
 
 type WorldSummaryPerson = {
   id: number;
@@ -20,7 +31,6 @@ type WorldSummaryResponse = {
   countriesCount: number;
   peopleCount: number;
 
-  // backend might use either name
   companyCount?: number;
   companiesCount?: number;
 
@@ -55,7 +65,7 @@ type StandingsResponse = {
 };
 
 type TopCompany = {
-  companyId?: number; // some APIs might just use "id"
+  companyId?: number;
   id?: number;
 
   companyName?: string;
@@ -87,7 +97,7 @@ type TopPerson = {
   age: number;
   countryId: number;
   countryName: string;
-  contributionScore?: number; // optional; falls back to sample people
+  contributionScore?: number;
 };
 
 export default function WorldOverviewPage() {
@@ -166,11 +176,10 @@ export default function WorldOverviewPage() {
         const companies = topCompaniesJson.companies ?? [];
         setTopCompanies(companies);
 
-        // derive topPeople from samplePeople (fallback)
         const ppl = Array.isArray(world.samplePeople) ? world.samplePeople : [];
         const derivedTopPeople: TopPerson[] = ppl
           .slice()
-          .sort((a, b) => a.age - b.age) // arbitrary but deterministic
+          .sort((a, b) => a.age - b.age)
           .slice(0, 10)
           .map((p) => ({
             id: p.id,
@@ -209,7 +218,7 @@ export default function WorldOverviewPage() {
       await fetch("/api/sim/year", { method: "POST" });
       window.location.reload();
     } catch {
-      // swallow; this is a convenience control
+      // swallow; convenience control
     }
   }
 
@@ -230,11 +239,6 @@ export default function WorldOverviewPage() {
   // --- Derived helpers -----------------------------------------------
   const standingsCountries: CountryStanding[] =
     getStandingsCountriesFromAny(standings);
-
-  const miniStandings = standingsCountries
-    .slice()
-    .sort((a, b) => a.currentRank - b.currentRank)
-    .slice(0, 10);
 
   const topCountries = standingsCountries
     .slice()
@@ -271,12 +275,11 @@ export default function WorldOverviewPage() {
     );
   }
 
-  // derive a safe company count from whichever field the API actually uses
   const companyCount = world.companyCount ?? world.companiesCount ?? 0;
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-4 text-xs">
-      {/* Page header – mirrors BBGM league header */}
+      {/* Page header – BBGM league header style */}
       <h1 className="text-lg font-semibold mb-1">{world.name}</h1>
       <p className="text-[11px] text-gray-600 mb-3">
         Year {world.currentYear} · Countries: {world.countriesCount} · People:{" "}
@@ -284,7 +287,7 @@ export default function WorldOverviewPage() {
         {companyCount.toLocaleString()}
       </p>
 
-      {/* World-level controls (these duplicate top-nav but are very BBGM-ish) */}
+      {/* World-level controls */}
       <div className="mb-4 flex flex-wrap gap-2">
         <button
           onClick={handleSimYear}
@@ -308,348 +311,27 @@ export default function WorldOverviewPage() {
 
       {/* 3-column BBGM layout */}
       <div className="grid grid-cols-12 gap-4">
-        {/* LEFT COLUMN – mini-standings + countries list */}
+        {/* LEFT COLUMN – mini standings + countries list */}
         <div className="col-span-12 md:col-span-3 flex flex-col gap-4">
-          {/* Mini Standings – BBGM-style */}
-          <section>
-            <h2 className="text-[11px] font-semibold mb-1 uppercase tracking-wide text-gray-700">
-              Standings
-            </h2>
-            {miniStandings.length === 0 ? (
-              <p className="text-[11px] text-gray-500">No standings yet.</p>
-            ) : (
-              <div className="border border-gray-200 rounded-sm overflow-hidden">
-                <table className="w-full border-collapse text-[11px]">
-                  <thead>
-                    <tr className="bg-gray-100 border-b border-gray-200 text-gray-700">
-                      <th className="text-left pl-2 pr-1 py-1">Country</th>
-                      <th className="text-right pr-2 py-1 w-10">Score</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {miniStandings.map((c, index) => {
-                      const stripe = index % 2 === 0 ? "bg-white" : "bg-gray-50";
-                      return (
-                        <tr
-                          key={c.countryId}
-                          className={`${stripe} border-b border-gray-200 hover:bg-[#eef3ff]`}
-                        >
-                          <td className="text-left pl-2 pr-1 py-1.5 flex items-center gap-2">
-                            {/* rank */}
-                            <span className="font-semibold text-gray-900">
-                              {index + 1}
-                            </span>
-
-                            {/* crest */}
-                            <CountryCrest id={c.countryId} name={c.countryName} />
-
-                            {/* name */}
-                            <Link
-                              href={`/country/${c.countryId}`}
-                              className="text-blue-700 hover:underline"
-                            >
-                              {c.countryName}
-                            </Link>
-                          </td>
-
-                          <td className="text-right pr-2 py-1.5">
-                            {formatScore(c.totalScore)}
-                          </td>
-                        </tr>
-                      );
-                    })}
-
-                  </tbody>
-                </table>
-              </div>
-            )}
-            <div className="mt-1 text-[11px]">
-              <Link
-                href={`/world/${world.id}/standings`}
-                className="text-blue-700 hover:underline"
-              >
-                Full standings →
-              </Link>
-            </div>
-          </section>
-
-
-          {/* Countries list */}
-          <section>
-            <h2 className="text-[11px] font-semibold mb-1 uppercase tracking-wide text-gray-700">
-              Countries
-            </h2>
-            {miniStandings.length === 0 ? (
-              <p className="text-[11px] text-gray-500">
-                Standings will populate after the first simulated year.
-              </p>
-            ) : (
-              <ul className="list-disc pl-4 space-y-[1px]">
-                {miniStandings.map((c) => (
-                  <li key={`list-${c.countryId}`}>
-                    <Link
-                      href={`/country/${c.countryId}`}
-                      className="text-blue-700 hover:underline"
-                    >
-                      {c.countryName}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
+          <CountryStandingsMini
+            standings={standingsCountries}
+            worldId={world.id}
+          />
+          <CountriesList standings={standingsCountries} />
         </div>
 
-        {/* CENTER COLUMN – world snapshot, top countries, world stats, top companies */}
+        {/* CENTER COLUMN – snapshot, top countries, stats, top companies */}
         <div className="col-span-12 md:col-span-6 flex flex-col gap-4">
-          {/* World snapshot */}
-          <section>
-            <h2 className="text-[11px] font-semibold mb-1 text-gray-800">
-              World snapshot
-            </h2>
-            <div className="grid grid-cols-4 gap-2 text-[11px]">
-              <div>
-                <div className="text-gray-500">Year</div>
-                <div className="font-semibold">{world.currentYear}</div>
-              </div>
-              <div>
-                <div className="text-gray-500">Countries</div>
-                <div className="font-semibold">{world.countriesCount}</div>
-              </div>
-              <div>
-                <div className="text-gray-500">People</div>
-                <div className="font-semibold">
-                  {world.peopleCount.toLocaleString()}
-                </div>
-              </div>
-              <div>
-                <div className="text-gray-500">Companies</div>
-                <div className="font-semibold">
-                  {companyCount.toLocaleString()}
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* Top countries this year – mirrors "Team Leaders" block */}
-          <section>
-            <h2 className="text-[11px] font-semibold mb-1 text-gray-800">
-              Top countries this year
-            </h2>
-            {topCountries.length === 0 ? (
-              <p className="text-[11px] text-gray-500">
-                Sim a year to generate country performance.
-              </p>
-            ) : (
-              <table className="w-full border-collapse text-[11px]">
-                <thead>
-                  <tr className="border-b border-gray-200 text-gray-600">
-                    <th className="text-left pr-1 py-1 w-4">#</th>
-                    <th className="text-left pr-1 py-1">Country</th>
-                    <th className="text-right pr-1 py-1">Total</th>
-                    <th className="text-right pr-1 py-1">Company</th>
-                    <th className="text-right pr-1 py-1">Gov</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {topCountries.map((c) => (
-                    <tr
-                      key={`top-country-${c.countryId}`}
-                      className="border-b border-gray-100 hover:bg-[#eef3ff]"
-                    >
-                      <td className="text-left pr-1 py-[3px]">{c.currentRank}</td>
-                      <td className="text-left pr-1 py-[3px]">
-                        <Link
-                          href={`/country/${c.countryId}`}
-                          className="text-blue-700 hover:underline"
-                        >
-                          {c.countryName}
-                        </Link>
-                      </td>
-                      <td className="text-right pr-1 py-[3px]">
-                        {formatScore(c.totalScore)}
-                      </td>
-                      <td className="text-right pr-1 py-[3px]">
-                        {formatScore(c.companyScore)}
-                      </td>
-                      <td className="text-right pr-1 py-[3px]">
-                        {formatScore(c.governmentScore)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </section>
-
-          {/* World stats block – BBGM-style "Team Stats" analogue */}
-          <section>
-            <h2 className="text-[11px] font-semibold mb-1 text-gray-800">
-              World stats
-            </h2>
-            {worldStats ? (
-              <div className="grid grid-cols-2 gap-2 text-[11px]">
-                <div>
-                  <div className="text-gray-500">Average company output</div>
-                  <div className="font-semibold">
-                    {worldStats.avgCompanyOutput.toFixed(1)}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-gray-500">Champion (last year)</div>
-                  <div className="font-semibold">
-                    {worldStats.lastChampionName ?? "—"}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-gray-500">Best gov score</div>
-                  <div className="font-semibold">
-                    {worldStats.bestGovernmentScoreName
-                      ? `${worldStats.bestGovernmentScoreName} (${Math.round(
-                          worldStats.bestGovernmentScoreValue
-                        )})`
-                      : "—"}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-gray-500">
-                    Countries with &gt;0 gov score
-                  </div>
-                  <div className="font-semibold">
-                    {worldStats.countriesWithGovScore}/
-                    {worldStats.totalCountries}
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <p className="text-[11px] text-gray-500">
-                World stats will appear after the first simulated season.
-              </p>
-            )}
-          </section>
-
-          {/* Top companies this year – mirrors BBGM "League Leaders" */}
-          <section>
-            <h2 className="text-[11px] font-semibold mb-1 text-gray-800">
-              Top companies this year
-            </h2>
-            {topCompanies.length === 0 ? (
-              <p className="text-[11px] text-gray-500">
-                Sim a year to generate company performance.
-              </p>
-            ) : (
-              <table className="w-full border-collapse text-[11px]">
-                <thead>
-                  <tr className="border-b border-gray-200 text-gray-600">
-                    <th className="text-left pr-1 py-1 w-4">#</th>
-                    <th className="text-left pr-1 py-1">Company</th>
-                    <th className="text-left pr-1 py-1">Country</th>
-                    <th className="text-left pr-1 py-1">Industry</th>
-                    <th className="text-right pr-1 py-1">Output</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {topCompanies.slice(0, 10).map((c, index) => {
-                    const companyId = c.companyId ?? c.id ?? index;
-                    const companyName = c.companyName ?? c.name ?? "Unknown";
-                    const countryName = c.countryName ?? c.country ?? "Unknown";
-                    return (
-                      <tr
-                        key={companyId}
-                        className="border-b border-gray-100 hover:bg-[#eef3ff]"
-                      >
-                        <td className="text-left pr-1 py-[3px]">{index + 1}</td>
-                        <td className="text-left pr-1 py-[3px]">
-                          <Link
-                            href={`/company/${companyId}`}
-                            className="text-blue-700 hover:underline"
-                          >
-                            {companyName}
-                          </Link>
-                        </td>
-                        <td className="text-left pr-1 py-[3px]">
-                          <Link
-                            href={`/country/${c.countryId}`}
-                            className="text-blue-700 hover:underline"
-                          >
-                            {countryName}
-                          </Link>
-                        </td>
-                        <td className="text-left pr-1 py-[3px]">
-                          {c.industry}
-                        </td>
-                        <td className="text-right pr-1 py-[3px]">
-                          {formatScore(c.outputScore)}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            )}
-          </section>
+          <WorldSnapshotPanel world={world} companyCount={companyCount} />
+          <TopCountriesTable countries={topCountries} />
+          <WorldStatsPanel stats={worldStats} />
+          <TopCompaniesTable companies={topCompanies} />
         </div>
 
-        {/* RIGHT COLUMN – headlines + top people */}
+        {/* RIGHT COLUMN – headlines + people sample */}
         <div className="col-span-12 md:col-span-3 flex flex-col gap-4">
-          {/* League headlines */}
-          <section>
-            <h2 className="text-[11px] font-semibold mb-1 text-gray-800">
-              League headlines
-            </h2>
-            {headlines.length === 0 ? (
-              <p className="text-[11px] text-gray-500">
-                Sim a year to generate headlines.
-              </p>
-            ) : (
-              <div className="space-y-2">
-                {headlines.map((h) => (
-                  <div
-                    key={h.id}
-                    className="border border-gray-200 rounded px-2 py-1.5 text-[11px] bg-white"
-                  >
-                    <div className="font-semibold text-blue-800 mb-[1px]">
-                      {h.title}
-                    </div>
-                    <div className="text-gray-600 leading-snug">
-                      {h.subtitle}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-
-          {/* Top people / sample */}
-          <section>
-            <h2 className="text-[11px] font-semibold mb-1 text-gray-800">
-              People (notable sample)
-            </h2>
-            {topPeople.length === 0 ? (
-              <p className="text-[11px] text-gray-500">
-                People sample will appear once the world is seeded.
-              </p>
-            ) : (
-              <ul className="space-y-[2px]">
-                {topPeople.map((p) => (
-                  <li key={p.id}>
-                    <Link
-                      href={`/person/${p.id}`}
-                      className="text-blue-700 hover:underline"
-                    >
-                      {p.name}
-                    </Link>{" "}
-                    <span className="text-gray-600">
-                      — age {p.age} — country {p.countryName}
-                      {typeof p.contributionScore === "number"
-                        ? ` — contrib ${Math.round(p.contributionScore)}`
-                        : ""}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
+          <LeagueHeadlines headlines={headlines} />
+          <PeopleSampleList people={topPeople} />
         </div>
       </div>
     </div>
@@ -657,21 +339,8 @@ export default function WorldOverviewPage() {
 }
 
 // ------------------------------------------------------------------
-// Small helper components & functions
+// Helpers
 // ------------------------------------------------------------------
-
-function TrendGlyph({ trend }: { trend: CountryStanding["trend"] }) {
-  if (trend === "up") {
-    return <span className="text-[10px] text-emerald-600">▲</span>;
-  }
-  if (trend === "down") {
-    return <span className="text-[10px] text-red-500">▼</span>;
-  }
-  if (trend === "new") {
-    return <span className="text-[10px] text-gray-500">•</span>;
-  }
-  return <span className="text-[10px] text-gray-400">–</span>;
-}
 
 function getStandingsCountriesFromAny(
   raw: StandingsResponse | CountryStanding[] | null | undefined
@@ -679,7 +348,6 @@ function getStandingsCountriesFromAny(
   if (!raw) return [];
 
   if (Array.isArray(raw)) {
-    // API returned a bare array
     return raw as CountryStanding[];
   }
 
@@ -698,34 +366,14 @@ function getStandingsCountriesFromAny(
   return [];
 }
 
-function formatScore(value: unknown): string {
-  if (value == null) return "—";
-  const num =
-    typeof value === "number"
-      ? value
-      : Number(value);
-  if (!Number.isFinite(num)) return "—";
-  return Math.round(num).toString();
-}
-
 function computeWorldStats(
   countries: CountryStanding[],
   year: number | null
-):
-  | {
-      avgCompanyOutput: number;
-      lastChampionName: string | null;
-      bestGovernmentScoreName: string | null;
-      bestGovernmentScoreValue: number;
-      countriesWithGovScore: number;
-      totalCountries: number;
-    }
-  | null {
+): WorldStats | null {
   if (!countries || countries.length === 0) return null;
 
   const totalCountries = countries.length;
 
-  // average company output based on companyScore (treat missing / NaN as 0)
   const avgCompanyOutput =
     countries.reduce((sum, c) => {
       const raw = (c as any).companyScore;
@@ -734,7 +382,6 @@ function computeWorldStats(
       return sum + companyScore;
     }, 0) / Math.max(1, totalCountries);
 
-  // last champion: look through history for champion in most recent year < current year
   let lastChampionName: string | null = null;
   let bestYear = -Infinity;
   for (const c of countries) {
@@ -751,7 +398,6 @@ function computeWorldStats(
     }
   }
 
-  // best government score (handle missing / NaN)
   let bestGovernmentScoreName: string | null = null;
   let bestGovernmentScoreValue = -Infinity;
   let countriesWithGovScore = 0;

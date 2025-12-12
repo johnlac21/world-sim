@@ -1,0 +1,399 @@
+FRONTEND DEVELOPER ONBOARDING — WORLD SIM BBGM
+
+VERSION: 1.0
+GOAL: Explain how the frontend is structured (Next.js + React), how the BBGM-style UI kit works, and how to add new pages and components without dumping more logic into page.tsx.
+
+This is specifically about the UI architecture and how to extend it safely.
+
+1. Tech stack & high-level layout
+
+World Sim BBGM uses:
+
+Next.js App Router
+
+React + TypeScript
+
+Tailwind CSS for styling
+
+High-level frontend structure:
+
+src/app/*
+Route entry points (pages). They handle data fetching, routing, simple derived data, and then pass props into components.
+
+src/components/ui/*
+Generic, reusable BBGM-style UI kit. No world/country semantics. Things like Table, DataTable, SectionHeader, CountryCrest, formatScore.
+
+src/components/world/*
+World dashboard components that know about “worlds”, “countries”, “companies”, etc. They are presentational for this domain: they receive typed props from pages and render using the UI kit.
+
+Later, we’ll mirror this pattern for other domains:
+
+src/components/country/*
+
+src/components/company/*
+
+src/components/person/*
+
+The key idea: pages wire data; components render it.
+
+2. UI kit (src/components/ui)
+
+The UI kit is our BBGM-style design system. These components:
+
+Are purely presentational.
+
+Do not fetch data.
+
+Should not know about domain types like WorldSummaryResponse or CountryStanding.
+
+Encapsulate visual rules: typography, spacing, hover states, stripes, etc.
+
+2.1. Existing UI kit primitives
+
+Current important pieces:
+
+Table.tsx
+Low-level table primitives you can hand-assemble when needed:
+
+<Table> – base <table> with border, background, and dense option.
+
+<TableHead>, <TableBody> – wrap <thead>/<tbody>.
+
+<TableRow> – row with zebra striping, optional highlight.
+
+<Th>, <Td> – header/data cells with alignment helpers.
+
+DataTable.tsx
+Higher-level BBGM leaderboard table that builds on the primitives above. This is the preferred way to render “standings”, “leaders”, etc. It takes:
+
+export type DataTableColumn = {
+  key: string;
+  label: string;
+  align?: "left" | "right" | "center";
+  widthClassName?: string;
+};
+
+export type DataTableRow = {
+  key: React.Key;
+  cells: Record<string, React.ReactNode>;
+};
+
+
+You pass columns and rows, and it handles:
+
+Header styling
+
+Zebra striping
+
+Hover highlight
+
+Borders
+
+Compact BBGM typography
+
+SectionHeader.tsx
+Tiny reusable section label for things like “Standings”, “World stats”, etc.:
+
+<SectionHeader>Standings</SectionHeader>
+
+
+This ensures consistent uppercase, tracking, font size, and alignment across the app.
+
+CountryCrest.tsx
+Circular badge for countries with deterministic pastel colors and initials. Takes { id, name } and renders a small, colored circle.
+
+formatScore.ts
+Utility for converting numeric values to BBGM-style display (rounded integers, safe fallback to "—" when null/NaN).
+
+2.2. Rules for UI kit components
+
+When you add or modify UI kit components:
+
+No data fetching (fetch, useEffect, etc.)
+
+No routing logic (useRouter, Link with domain-specific URLs is okay in some cases, but generally keep routing in domain components).
+
+Keep props generic, reusable, and domain-agnostic.
+
+Use Tailwind for styling; avoid inline styles except for things like dynamic colors (CountryCrest hue).
+
+If you find yourself writing the same Tailwind classes in multiple places, that’s usually a hint that a new UI kit component is needed.
+
+3. Domain components (src/components/world)
+
+Domain components sit between pages and the UI kit. They:
+
+Do know about our domain types (WorldSummaryResponse, CountryStanding, TopCompany, etc.).
+
+Do not fetch data. They receive props.
+
+Use only:
+
+The UI kit components
+
+Tailwind
+
+Simple domain logic (sorting, filtering, slicing)
+
+3.1. Current world components
+
+The world overview currently uses:
+
+CountryStandingsMini.tsx
+Left-column standings mini-table:
+
+Props: { standings: CountryStanding[]; worldId: number }
+
+Sorts by currentRank, takes top 10.
+
+Uses DataTable + CountryCrest + SectionHeader.
+
+Includes “Full standings →” link.
+
+CountriesList.tsx
+Left-column countries list:
+
+Props: { standings: CountryStanding[] }
+
+Uses sorted standings to render a bullet list of country links.
+
+Shows “Standings will populate…” message if empty.
+
+WorldSnapshotPanel.tsx
+Small four-stat grid:
+
+Props: { world: WorldSummaryResponse; companyCount: number }
+
+Displays year, number of countries, people, companies.
+
+Uses SectionHeader.
+
+TopCountriesTable.tsx
+Center-column “Top countries this year”:
+
+Props: { countries: CountryStanding[] }
+
+Uses top 5 by currentRank.
+
+Renders DataTable with columns #, Country, Total, Company, Gov.
+
+Uses formatScore for numeric cells.
+
+WorldStatsPanel.tsx
+World-level derived stats:
+
+Props: { stats: WorldStats | null }
+(WorldStats is a type exported from src/components/world/types.ts).
+
+If stats is null, shows a fallback message.
+
+Otherwise, shows average company output, last champion, best government score, and count of countries with gov score.
+
+TopCompaniesTable.tsx
+Center-column “Top companies this year”:
+
+Props: { companies: TopCompany[] }
+
+Uses DataTable with columns #, Company, Country, Industry, Output.
+
+Uses formatScore for outputScore.
+
+Links to /company/[id] and /country/[id].
+
+LeagueHeadlines.tsx
+Right-column headlines:
+
+Props: { headlines: Headline[] }
+
+Shows “Sim a year to generate headlines.” if empty.
+
+Otherwise, renders small headline cards with title + subtitle.
+
+PeopleSampleList.tsx
+Right-column notable people:
+
+Props: { people: TopPerson[] }
+
+Shows fallback when empty.
+
+Otherwise, renders a list of people linking to /person/[id] with age, country, and optional contribution score.
+
+3.2. Rules for domain components
+
+When adding new domain components (world, country, company, person, etc.):
+
+Props in, JSX out. Do not fetch inside.
+
+Use UI kit components for:
+
+Section labels (SectionHeader)
+
+Tables/leaderboards (DataTable)
+
+Badges (CountryCrest)
+
+Formatting (formatScore)
+
+Keep them as small as makes sense: one component per panel or block of the page.
+
+Examples of good domain components for future pages:
+
+src/components/country/CountryOverviewHeader.tsx
+
+src/components/country/CountryCompaniesTable.tsx
+
+src/components/person/PersonCareerTimeline.tsx
+
+src/components/company/CompanyOrgChart.tsx
+
+4. Pages (src/app)
+
+Pages are the only place where we:
+
+Fetch data from APIs.
+
+Use routing hooks like useRouter.
+
+Handle loading/error states.
+
+Compute derived domain props for components.
+
+They should be thin “controllers” that glue data to visual components.
+
+4.1. WorldOverviewPage as the canonical example
+
+src/app/page.tsx (WorldOverviewPage) does the following:
+
+Fetches the world summary from /api/world.
+
+Once it has world.id, fetches:
+
+/api/world/:id/standings
+
+/api/world/:id/top-companies
+
+Computes:
+
+standingsCountries via getStandingsCountriesFromAny(...)
+
+topCountries (top N by rank)
+
+worldStats via computeWorldStats(...)
+
+headlines via buildHeadlines(...)
+
+topPeople from world.samplePeople
+
+Renders:
+
+Page header + action buttons (sim year, reset world, My Country).
+
+Three-column layout:
+
+Left: <CountryStandingsMini />, <CountriesList />
+
+Center: <WorldSnapshotPanel />, <TopCountriesTable />, <WorldStatsPanel />, <TopCompaniesTable />
+
+Right: <LeagueHeadlines />, <PeopleSampleList />
+
+Notice: all the tables, section headers, and visual layouts are in components, not inline in page.tsx.
+
+4.2. Rules for new pages
+
+When creating a new page (e.g., /country/[id], /company/[id], /person/[id]):
+
+Put route logic + fetches in src/app/.../page.tsx.
+
+Put most of the JSX into domain components under src/components/<domain>/.
+
+Reuse UI kit components for:
+
+Section headers
+
+Tables
+
+Badges
+
+Formatting
+
+Do not write new raw <table> markup directly in a page. Instead, build columns + rows and use DataTable.
+
+5. Styling & conventions
+
+To keep everything visually consistent and BBGM-like:
+
+Typography
+
+Tables and small UI use text-[11px].
+
+Page titles use text-lg font-semibold.
+
+Section headers always use SectionHeader.
+
+Links
+
+Use className="text-blue-700 hover:underline" for primary links.
+
+Tables
+
+Use DataTable for all leaderboard/standings-style tables.
+
+Use Table primitives only if you need bespoke structure that doesn’t fit columns/rows.
+
+Badges
+
+Use CountryCrest anywhere you show a country icon.
+
+Formatting
+
+Use formatScore for numeric scores so you don’t have ad hoc Math.round calls scattered throughout.
+
+6. How to add a new leaderboard/table
+
+Template for extending the system:
+
+Decide the domain (world, country, company, person).
+
+Add or reuse a domain component:
+
+Example: src/components/country/CountryYouthTalentTable.tsx
+
+Define its props in terms of domain types:
+
+e.g. Props = { players: PlayerStanding[] }
+
+Inside it:
+
+Build columns: DataTableColumn[].
+
+Build rows: DataTableRow[], mapping domain objects to cells.
+
+Use formatScore for numeric stats.
+
+Use CountryCrest and Link components as needed.
+
+In the page (src/app/country/[id]/page.tsx):
+
+Fetch data.
+
+Derive players array.
+
+Render <CountryYouthTalentTable players={players} />.
+
+7. Quick checklist for frontend changes
+
+When you touch the frontend, ask:
+
+Am I:
+
+ Fetching only in pages (or API routes), not in UI kit/domain components?
+
+ Using UI kit components (SectionHeader, DataTable, CountryCrest, formatScore) instead of duplicating styles?
+
+ Keeping domain components small, focused, and prop-driven?
+
+ Avoiding new raw <table> markup in pages?
+
+ Naming files by domain (world, country, company, person) and feature (TopCompaniesTable, WorldStatsPanel, etc.)?
+
+If yes to all, you’re building frontend in the “World Sim BBGM way” and future pages will be easy to maintain and extend.
