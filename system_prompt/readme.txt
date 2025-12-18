@@ -827,3 +827,104 @@ Recent Additions:
 
 - Introduced PersonYearPerformance, a per-person yearly contribution model populated during each simulation tick. For every occupied CompanyPosition, the sim now stores talentScore, leadershipScore, reliabilityScore, industry, and a combined contributionScore. This enables future leaderboards, awards, and career pages without recomputing stats on the fly.
 
+UI Layout Shell (Ticket 24)
+
+A full BBGM-style global UI shell is now implemented across the entire app.
+This includes:
+
+A persistent top navigation bar (world name, year, Sim 1 Year, Reset World, My Country, search).
+
+A left sidebar navigation with WORLD, COUNTRY, PEOPLE, and COMPANIES sections.
+
+A centralized page wrapper with BBGM-style dense, data-first layout.
+
+Integration through a new GameLayout component, now wrapping all pages via RootLayout.
+
+Updated globals.css to follow the UI Vision palette (#f2f2f2 background, compact spacing).
+
+This establishes a consistent UI frame for all future page upgrades.
+
+
+Player Dashboard UI v2 (Ticket 24)
+
+The /player page now uses the three-column BBGM dashboard layout defined in the UI Vision document.
+New features include:
+
+Left column: Mini-standings widget + Your Standing summary.
+
+Center column: Country Overview panels, yearly performance breakdown, and a Youth Pipeline quick view.
+
+Right column: Government summary (via GovernmentCard) and dynamic Headlines (champion, rank, cabinet strength, top prospect).
+
+Integrated TalentSearchModal with top-bar access.
+
+This page is now the main “team dashboard” equivalent for the controlled country.
+
+- First-pass UI refactor for core views:
+  - New world overview layout with left-hand navigation, top world/year header, and primary actions (Sim 1 Year, Reset World, My Country).
+  - Refreshed person page with grouped attribute blocks (Cognitive, Social/Influence, Physical, Personality), plus clearer sections for career, education, and relationships.
+  - Country Industry Structure page with industry tabs (Tech/Finance/Research), an aggregate output summary, and per-company cards that surface hierarchy slots and v0 performance scores.
+  - Youth Pipeline player view with sortable table of prospects, university eligibility flags, and a “Save admissions” workflow that posts selected 18-year-olds back to the server.
+  - Global Leaders and Office pages now show cleaner summaries and link through to office history and individual person profiles.
+  - Company hierarchy sidebar component that shows the full ladder from President down to Worker, including key stats for each person.
+- Talent Search modal for scouting people across the world by age, stats, employment status, and industry experience, with pagination and optional “Select” callbacks for future assignment flows.
+
+Company Page UI v2 (Ticket 25)
+
+The /company/[id] page has been rebuilt into a BBGM-style two-column layout. The main column focuses on performance (current-year panel, benchmark, peers, and a mini history chart), while the sidebar becomes a sticky “depth chart” editor for the company hierarchy.
+Key improvements include:
+- Current-year performance panel with talent/leadership/reliability breakdown on top of outputScore.
+- Industry benchmark and peers table driven by CompanyYearPerformance, highlighting the current company.
+- Compact performance history bar chart across recent seasons.
+- A company hierarchy sidebar using DepthChartRow, with edit mode, lock icons, and integrated TalentSearchModal for controlled-country companies.
+
+Standings Page UI v2 (Ticket 26)
+
+The /world/[id]/standings page has been upgraded to a wide, BBGM-style league table. Countries are now clearly ranked by CountryYearPerformance, with movement vs. last year surfaced via compact trend icons and recent-season history.
+Key improvements include:
+- Redesigned league table with dense, readable columns for rank, country, totalScore, last year rank, trend, and recent seasons.
+- Trend arrows (+1 / –1 / same / new) derived from multi-year CountryYearPerformance.
+- Visual highlighting of the player-controlled country’s row.
+- Integrated Top Companies section on the same page so users can see how elite companies relate to the current standings.
+
+Person Page UI v2 (Ticket 27)
+
+The /person/[id] page now behaves like a BBGM “player card” for people in the world. A two-column layout separates core stats and performance from quick facts and career history, tying in the new PersonYearPerformance data.
+Key improvements include:
+- A 24-attribute grid grouped into Cognitive, Social/Influence, Physical, and Personality categories using StatPill.
+- A PersonYearPerformance mini bar chart showing contributionScore by year, plus peak season and industry summary.
+- Structured employment and education history tables with current and past entries clearly separated.
+- New role and office history sections (company hierarchy roles and political terms), alongside a cleaned-up relationships panel.
+
+BBGM-Style UI Conversion (World Overview + Layout Update)
+
+Date: UI Sprint – BBGM Sheet Layout Adoption
+
+Converted / (world overview) to a BBGM-style single-sheet dashboard
+
+Removed panel/card layouts
+
+Adopted flat sections, dense tables, and compact typography
+
+Introduced a 3-column structure: mini standings, snapshot/top companies, headlines
+
+Updated global GameLayout to use a centered white content sheet with border-x
+
+Sidebar and top navigation remain, but spacing and font sizes now match BBGM density
+
+Added compact mode + sizing options to SectionHeader (size, compact)
+
+Updated tables to use a flat, dense BBGM look on the world overview page
+
+UI Vision Document revised to reflect new panel-minimalist, table-first, single-sheet design language
+
+### BBGM-Style Homepage UI Overhaul (Dec 2025)
+
+- Implemented a BBGM-inspired homepage layout with a 3-column grid (standings, world snapshot, stats, headlines).
+- Added zebra-striped tables, gray header bars, hover states, and score formatting for a more authentic BBGM visual identity.
+- Added safe numeric formatting via `formatScore()` to prevent NaN values from breaking the UI.
+- Introduced `CountryCrest` UI component (pastel circular badge with country initials) for use in standings and leaderboards.
+- Updated mini standings to use new BBGM-style table structure and crest icons.
+- Began structuring the future Shared UI Component Library (e.g., DataTable, SectionHeader, CountryCrest).
+- Improved robustness of data parsing with `getStandingsCountriesFromAny()` helper.
+- Fixed multiple runtime errors caused by optional fields (`companyScore`, `governmentScore`, etc.) and missing company count keys.

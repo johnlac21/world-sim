@@ -1,9 +1,20 @@
 // src/app/country/[id]/page.tsx
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useParams } from "next/navigation";
+
+import { Panel, PanelBody, PanelHeader } from "@/components/ui/Panel";
+import { SectionHeader } from "@/components/ui/SectionHeader";
+import {
+  Table,
+  TableHead,
+  TableBody,
+  TableRow,
+  Th,
+  Td,
+} from "@/components/ui/Table";
 
 type CountryOffice = {
   id: number;
@@ -60,7 +71,7 @@ type CountryHistoryRow = {
   leaderName: string | null;
 };
 
-type Trend = 'up' | 'down' | 'same' | 'new';
+type Trend = "up" | "down" | "same" | "new";
 
 type CountryPayload = {
   id: number;
@@ -68,16 +79,13 @@ type CountryPayload = {
   worldId: number;
   worldName: string;
   offices: CountryOffice[];
-  // Current-year performance summary (already used)
   performance?: CountryPerformanceSummary | null;
-  // NEW: history over time (optional; can be empty array)
   history?: CountryHistoryRow[];
 };
 
 function computeTrend(
   rows: CountryHistoryRow[],
 ): (CountryHistoryRow & { trend: Trend })[] {
-  // Ensure chronological order
   const sorted = rows.slice().sort((a, b) => a.year - b.year);
 
   return sorted.map((row, idx) => {
@@ -85,18 +93,18 @@ function computeTrend(
     const currentRank = row.rank;
     const prevRank = prev?.rank ?? null;
 
-    let trend: Trend = 'same';
+    let trend: Trend = "same";
 
     if (currentRank == null) {
-      trend = 'same';
+      trend = "same";
     } else if (prevRank == null) {
-      trend = 'new';
+      trend = "new";
     } else if (currentRank < prevRank) {
-      trend = 'up';
+      trend = "up";
     } else if (currentRank > prevRank) {
-      trend = 'down';
+      trend = "down";
     } else {
-      trend = 'same';
+      trend = "same";
     }
 
     return { ...row, trend };
@@ -104,16 +112,16 @@ function computeTrend(
 }
 
 function TrendIcon({ trend }: { trend: Trend }) {
-  if (trend === 'up') {
+  if (trend === "up") {
     return <span className="text-green-600 text-xs font-semibold">↑</span>;
   }
-  if (trend === 'down') {
+  if (trend === "down") {
     return <span className="text-red-600 text-xs font-semibold">↓</span>;
   }
-  if (trend === 'same') {
+  if (trend === "same") {
     return <span className="text-gray-500 text-xs">→</span>;
   }
-  // 'new'
+  // "new"
   return <span className="text-blue-600 text-xs">•</span>;
 }
 
@@ -142,14 +150,18 @@ export default function CountryPage() {
   }, [id]);
 
   if (loading) {
-    return <main className="p-4">Loading country…</main>;
+    return (
+      <main className="p-4">
+        <p className="text-sm text-gray-600">Loading country…</p>
+      </main>
+    );
   }
 
   if (!data || (data as any).error) {
     return (
       <main className="p-4 space-y-2">
-        <p>Country not found.</p>
-        <Link href="/" className="text-blue-600 underline">
+        <p className="text-sm text-red-600">Country not found.</p>
+        <Link href="/" className="text-blue-600 underline text-sm">
           ← Back to world
         </Link>
       </main>
@@ -162,281 +174,259 @@ export default function CountryPage() {
 
   return (
     <main className="p-4 space-y-6">
-      {/* Header */}
-      <header className="space-y-1">
-        <Link href="/" className="text-blue-600 underline">
-          ← Back to world
-        </Link>
-        <h1 className="text-2xl font-bold">
-          {data.name} — Country Overview
-        </h1>
-        <p className="text-sm text-gray-600">World: {data.worldName}</p>
-        <p className="mt-1">
+      <SectionHeader
+        title={`${data.name} — Country Overview`}
+        description={`World: ${data.worldName}`}
+        action={
           <Link
-            href={`/country/${id}/industry`}
-            className="text-sm text-blue-600 underline"
+            href={`/world/${data.worldId}/standings`}
+            className="text-xs text-blue-600 hover:underline"
           >
-            View Industry Structure →
+            ← Back to standings
           </Link>
-        </p>
-      </header>
+        }
+      />
 
-      {/* ===== HISTORY PANEL (NEW) ===== */}
-      <section className="border rounded-lg p-4 bg-white shadow-sm space-y-4">
-        <h2 className="text-lg font-semibold">History</h2>
-        <p className="text-xs text-gray-500">
-          TotalScore and rank over time for this country. Champion years are
-          highlighted; leaders show who was in charge in each season.
-        </p>
+      <Panel>
+        <PanelHeader
+          title="Structure & Industries"
+          subtitle={
+            <Link
+              href={`/country/${id}/industry`}
+              className="text-xs text-blue-600 hover:underline"
+            >
+              View Industry Structure →
+            </Link>
+          }
+        />
+      </Panel>
 
-        {history.length === 0 ? (
-          <p className="text-sm text-gray-600">
-            No performance history yet — simulate at least one season to
-            generate country history.
-          </p>
-        ) : (
-          <>
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-xs border border-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-2 py-1 text-left border-b">Year</th>
-                    <th className="px-2 py-1 text-right border-b">
-                      TotalScore
-                    </th>
-                    <th className="px-2 py-1 text-right border-b">Rank</th>
-                    <th className="px-2 py-1 text-left border-b">Leader</th>
-                    <th className="px-2 py-1 text-center border-b">Champ</th>
-                    <th className="px-2 py-1 text-center border-b">Trend</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {history.map((row) => (
-                    <tr
-                      key={row.year}
-                      className={
-                        row.isChampion
-                          ? 'bg-yellow-50 font-semibold'
-                          : 'odd:bg-white even:bg-gray-50'
-                      }
-                    >
-                      <td className="px-2 py-1 border-b">{row.year}</td>
-                      <td className="px-2 py-1 border-b text-right">
-                        {row.totalScore.toFixed(1)}
-                      </td>
-                      <td className="px-2 py-1 border-b text-right">
-                        {row.rank ?? '–'}
-                      </td>
-                      <td className="px-2 py-1 border-b">
-                        {row.leaderName ?? '—'}
-                      </td>
-                      <td className="px-2 py-1 border-b text-center">
-                        {row.isChampion ? '★' : ''}
-                      </td>
-                      <td className="px-2 py-1 border-b text-center">
-                        <TrendIcon trend={row.trend} />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Tiny text "sparkline" summary for recent years */}
-            <p className="text-[11px] text-gray-500">
-              Recent seasons:{' '}
-              {history
-                .slice(-8)
-                .map(
-                  (h) =>
-                    `${h.year}: ${h.totalScore.toFixed(0)}${
-                      h.isChampion ? '★' : ''
-                    }`,
-                )
-                .join(' · ')}
+      {/* HISTORY PANEL */}
+      <Panel>
+        <PanelHeader
+          title="History"
+          subtitle="TotalScore and rank over time. Champion years are highlighted; each season shows the country’s leader."
+        />
+        <PanelBody className="space-y-3">
+          {history.length === 0 ? (
+            <p className="text-sm text-gray-600">
+              No performance history yet — simulate at least one season to
+              generate country history.
             </p>
-          </>
-        )}
-      </section>
+          ) : (
+            <>
+              <Table dense>
+                <TableHead>
+                  <tr>
+                    <Th>Year</Th>
+                    <Th align="right">TotalScore</Th>
+                    <Th align="right">Rank</Th>
+                    <Th>Leader</Th>
+                    <Th align="center">Champ</Th>
+                    <Th align="center">Trend</Th>
+                  </tr>
+                </TableHead>
+                <TableBody>
+                  {history.map((row) => (
+                    <TableRow
+                      key={row.year}
+                      highlight={row.isChampion}
+                      zebra
+                    >
+                      <Td>{row.year}</Td>
+                      <Td align="right">
+                        {row.totalScore.toFixed(1)}
+                      </Td>
+                      <Td align="right">{row.rank ?? "–"}</Td>
+                      <Td>{row.leaderName ?? "—"}</Td>
+                      <Td align="center">
+                        {row.isChampion ? "★" : ""}
+                      </Td>
+                      <Td align="center">
+                        <TrendIcon trend={row.trend} />
+                      </Td>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
 
-      {/* ===== Country Performance Panel (existing) ===== */}
-      <section className="border rounded-lg p-4 bg-white shadow-sm space-y-4">
-        <h2 className="text-lg font-semibold">Country Performance</h2>
-
-        {!perf || perf.overall.numCompanies === 0 ? (
-          <p className="text-sm text-gray-600">
-            No performance data yet for this country — simulate a year to see
-            results.
-          </p>
-        ) : (
-          <>
-            {/* Overall summary */}
-            <div className="space-y-1">
-              <p className="text-sm font-medium">
-                Year {perf.year} performance:
-                <span className="ml-1 text-base font-semibold">
-                  {perf.overall.totalOutput.toFixed(1)}
-                </span>
+              <p className="text-[11px] text-gray-500">
+                Recent seasons:{" "}
+                {history
+                  .slice(-8)
+                  .map(
+                    (h) =>
+                      `${h.year}: ${h.totalScore.toFixed(0)}${
+                        h.isChampion ? "★" : ""
+                      }`,
+                  )
+                  .join(" · ")}
               </p>
-              <p className="text-xs text-gray-600">
-                Companies with performance:{' '}
-                <span className="font-medium">
-                  {perf.overall.numCompanies}
-                </span>{' '}
-                · Average output per company:{' '}
-                <span className="font-medium">
-                  {perf.overall.averageOutput === null
-                    ? '—'
-                    : perf.overall.averageOutput.toFixed(1)}
-                </span>
-              </p>
-            </div>
+            </>
+          )}
+        </PanelBody>
+      </Panel>
 
-            {/* Per-industry table */}
-            <div className="pt-2">
-              <h3 className="text-sm font-medium mb-2">
-                Performance by industry
-              </h3>
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-xs border border-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-2 py-1 text-left border-b">
-                        Industry
-                      </th>
-                      <th className="px-2 py-1 text-right border-b">
-                        Companies
-                      </th>
-                      <th className="px-2 py-1 text-right border-b">
-                        Total Output
-                      </th>
-                      <th className="px-2 py-1 text-right border-b">
-                        Avg Output
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {perf.industries.map((ind) => (
-                      <tr
-                        key={ind.industry}
-                        className="odd:bg-white even:bg-gray-50"
-                      >
-                        <td className="px-2 py-1 border-b">
-                          {ind.industry}
-                        </td>
-                        <td className="px-2 py-1 text-right border-b">
-                          {ind.numCompanies}
-                        </td>
-                        <td className="px-2 py-1 text-right border-b">
-                          {ind.totalOutput.toFixed(1)}
-                        </td>
-                        <td className="px-2 py-1 text-right border-b">
-                          {ind.averageOutput === null
-                            ? '—'
-                            : ind.averageOutput.toFixed(1)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Top companies list */}
-            <div className="pt-2">
-              <h3 className="text-sm font-medium mb-2">Top companies</h3>
-              {perf.topCompanies.length === 0 ? (
-                <p className="text-xs text-gray-600">
-                  No companies with performance this year.
+      {/* COUNTRY PERFORMANCE PANEL */}
+      <Panel>
+        <PanelHeader title="Country Performance" />
+        <PanelBody className="space-y-4">
+          {!perf || perf.overall.numCompanies === 0 ? (
+            <p className="text-sm text-gray-600">
+              No performance data yet for this country — simulate a year to see
+              results.
+            </p>
+          ) : (
+            <>
+              <div className="space-y-1">
+                <p className="text-sm font-medium">
+                  Year {perf.year} performance:{" "}
+                  <span className="ml-1 text-base font-semibold">
+                    {perf.overall.totalOutput.toFixed(1)}
+                  </span>
                 </p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full text-xs border border-gray-200">
-                    <thead className="bg-gray-50">
+                <p className="text-xs text-gray-600">
+                  Companies with performance:{" "}
+                  <span className="font-medium">
+                    {perf.overall.numCompanies}
+                  </span>{" "}
+                  · Average output per company:{" "}
+                  <span className="font-medium">
+                    {perf.overall.averageOutput === null
+                      ? "—"
+                      : perf.overall.averageOutput.toFixed(1)}
+                  </span>
+                </p>
+              </div>
+
+              {/* Per-industry table */}
+              <div className="pt-2">
+                <h3 className="text-sm font-medium mb-2">
+                  Performance by industry
+                </h3>
+                <Table dense>
+                  <TableHead>
+                    <tr>
+                      <Th>Industry</Th>
+                      <Th align="right">Companies</Th>
+                      <Th align="right">Total Output</Th>
+                      <Th align="right">Avg Output</Th>
+                    </tr>
+                  </TableHead>
+                  <TableBody>
+                    {perf.industries.map((ind) => (
+                      <TableRow key={ind.industry}>
+                        <Td>{ind.industry}</Td>
+                        <Td align="right">
+                          {ind.numCompanies}
+                        </Td>
+                        <Td align="right">
+                          {ind.totalOutput.toFixed(1)}
+                        </Td>
+                        <Td align="right">
+                          {ind.averageOutput === null
+                            ? "—"
+                            : ind.averageOutput.toFixed(1)}
+                        </Td>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Top companies list */}
+              <div className="pt-2">
+                <h3 className="text-sm font-medium mb-2">Top companies</h3>
+                {perf.topCompanies.length === 0 ? (
+                  <p className="text-xs text-gray-600">
+                    No companies with performance this year.
+                  </p>
+                ) : (
+                  <Table dense>
+                    <TableHead>
                       <tr>
-                        <th className="px-2 py-1 text-left border-b">
-                          Company
-                        </th>
-                        <th className="px-2 py-1 text-left border-b">
-                          Industry
-                        </th>
-                        <th className="px-2 py-1 text-right border-b">
-                          Output
-                        </th>
+                        <Th>Company</Th>
+                        <Th>Industry</Th>
+                        <Th align="right">Output</Th>
                       </tr>
-                    </thead>
-                    <tbody>
+                    </TableHead>
+                    <TableBody>
                       {perf.topCompanies.map((c) => (
-                        <tr
-                          key={c.companyId}
-                          className="odd:bg-white even:bg-gray-50"
-                        >
-                          <td className="px-2 py-1 border-b">
+                        <TableRow key={c.companyId}>
+                          <Td>
                             <Link
                               href={`/company/${c.companyId}`}
                               className="text-blue-600 hover:underline"
                             >
                               {c.name}
                             </Link>
-                          </td>
-                          <td className="px-2 py-1 border-b">
-                            {c.industry}
-                          </td>
-                          <td className="px-2 py-1 text-right border-b">
+                          </Td>
+                          <Td>{c.industry}</Td>
+                          <Td align="right">
                             {c.outputScore.toFixed(1)}
-                          </td>
-                        </tr>
+                          </Td>
+                        </TableRow>
                       ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </>
-        )}
-      </section>
+                    </TableBody>
+                  </Table>
+                )}
+              </div>
+            </>
+          )}
+        </PanelBody>
+      </Panel>
 
-      {/* ===== Existing political history below ===== */}
+      {/* POLITICAL OFFICES */}
       {data.offices.length === 0 ? (
-        <p>No political offices defined for this country.</p>
+        <p className="text-sm text-gray-600">
+          No political offices defined for this country.
+        </p>
       ) : (
-        data.offices.map((office) => (
-          <section key={office.id} className="space-y-2">
-            <h2 className="text-xl font-semibold">{office.name}</h2>
-            <p className="text-sm text-gray-600">
-              Level: {office.level} · Term length: {office.termLength} years ·
-              Prestige: {office.prestige}
-            </p>
+        <div className="space-y-4">
+          {data.offices.map((office) => (
+            <Panel key={office.id}>
+              <PanelHeader
+                title={office.name}
+                subtitle={`Level: ${office.level} · Term length: ${office.termLength} years · Prestige: ${office.prestige}`}
+              />
+              <PanelBody className="space-y-3">
+                <div>
+                  <h3 className="font-semibold text-sm">
+                    Current office holder
+                  </h3>
+                  {office.currentTerm ? (
+                    <p className="text-sm">
+                      {office.currentTerm.personName} (since year{" "}
+                      {office.currentTerm.startYear})
+                    </p>
+                  ) : (
+                    <p className="text-sm text-gray-600">
+                      No current office holder.
+                    </p>
+                  )}
+                </div>
 
-            <div className="mt-2">
-              <h3 className="font-semibold">Current office holder</h3>
-              {office.currentTerm ? (
-                <p>
-                  {office.currentTerm.personName} (since year{' '}
-                  {office.currentTerm.startYear})
-                </p>
-              ) : (
-                <p>No current office holder.</p>
-              )}
-            </div>
-
-            <div className="mt-3">
-              <h3 className="font-semibold">Past terms</h3>
-              {office.pastTerms.length === 0 ? (
-                <p className="text-sm text-gray-600">No past terms yet.</p>
-              ) : (
-                <ul className="list-disc ml-6 text-sm">
-                  {office.pastTerms.map((t) => (
-                    <li key={t.id}>
-                      {t.personName} — {t.startYear}
-                      {t.endYear != null ? `–${t.endYear}` : ''}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </section>
-        ))
+                <div>
+                  <h3 className="font-semibold text-sm">Past terms</h3>
+                  {office.pastTerms.length === 0 ? (
+                    <p className="text-sm text-gray-600">
+                      No past terms yet.
+                    </p>
+                  ) : (
+                    <ul className="list-disc ml-6 text-sm">
+                      {office.pastTerms.map((t) => (
+                        <li key={t.id}>
+                          {t.personName} — {t.startYear}
+                          {t.endYear != null ? `–${t.endYear}` : ""}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </PanelBody>
+            </Panel>
+          ))}
+        </div>
       )}
     </main>
   );

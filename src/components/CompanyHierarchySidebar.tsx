@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 
 type HierarchyPerson = {
   id: number;
@@ -51,17 +52,19 @@ export function CompanyHierarchySidebar({ companyId }: Props) {
 
       try {
         const res = await fetch(`/api/company/${companyId}/hierarchy`);
-        if (!res.ok) {
-          const body = await res.json().catch(() => ({}));
-          throw new Error(body.error || `Request failed (${res.status})`);
+        const json = (await res.json()) as ApiResponse & { error?: string };
+
+        if (!res.ok || (json as any).error) {
+          throw new Error((json as any).error || `Request failed (${res.status})`);
         }
-        const json = (await res.json()) as ApiResponse;
+
         if (!cancelled) {
           setData(json);
         }
       } catch (e: any) {
         if (!cancelled) {
           setError(e.message ?? 'Failed to load hierarchy');
+          setData(null);
         }
       } finally {
         if (!cancelled) {
@@ -84,8 +87,13 @@ export function CompanyHierarchySidebar({ companyId }: Props) {
 
       {data && (
         <p className="text-xs text-gray-500 mb-3">
-          {data.company.name} ·{' '}
-          <span className="font-medium">{data.company.industry}</span>
+          <Link
+            href={`/company/${data.company.id}`}
+            className="font-medium text-blue-700 hover:underline"
+          >
+            {data.company.name}
+          </Link>{' '}
+          · <span className="font-medium">{data.company.industry}</span>
         </p>
       )}
 
@@ -116,19 +124,25 @@ export function CompanyHierarchySidebar({ companyId }: Props) {
               {slot.occupied && slot.person ? (
                 <div className="mt-1">
                   <p className="text-xs font-medium text-gray-800">
-                    {slot.person.name}
+                    <Link
+                      href={`/person/${slot.person.id}`}
+                      className="hover:underline"
+                    >
+                      {slot.person.name}
+                    </Link>
                     <span className="ml-1 text-[10px] text-gray-500">
                       ({slot.person.age})
                     </span>
                   </p>
                   <p className="mt-0.5 text-[11px] text-gray-600">
-                    Int {slot.person.intelligence} · Lead {slot.person.leadership} ·
-                    Disc {slot.person.discipline} · Cha {slot.person.charisma}
+                    Int {slot.person.intelligence} · Lead {slot.person.leadership} · Disc{' '}
+                    {slot.person.discipline} · Cha {slot.person.charisma}
                   </p>
                 </div>
               ) : (
                 <p className="mt-1 text-xs italic text-gray-400">
-                  Vacant — will be filled next sim year if candidates are available.
+                  Vacant — will be filled next sim year if candidates are
+                  available.
                 </p>
               )}
             </li>

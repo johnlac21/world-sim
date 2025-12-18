@@ -1,44 +1,40 @@
 // src/app/player/page.tsx
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { TalentSearchModal } from '@/components/TalentSearchModal';
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { GovernmentCard } from "@/components/GovernmentCard";
+import { TalentSearchModal } from "@/components/TalentSearchModal";
+import { Panel, PanelBody, PanelHeader } from "@/components/ui/Panel";
+import { SectionHeader } from "@/components/ui/SectionHeader";
+import {
+  Table,
+  TableHead,
+  TableBody,
+  TableRow,
+  Th,
+  Td,
+} from "@/components/ui/Table";
+import { StatBadge } from "@/components/ui/StatBadge";
 
-type IndustryRow = {
-  industry: string;
-  numCompanies: number;
-  totalOutput: number;
-  averageOutput: number | null;
-};
-
-type TopCompanyRow = {
-  companyId: number;
-  name: string;
-  industry: string;
-  outputScore: number;
-};
-
-type CountryPerformanceSummary = {
-  countryId: number;
-  year: number;
-  overall: {
-    numCompanies: number;
-    totalOutput: number;
-    averageOutput: number | null;
-  };
-  industries: IndustryRow[];
-  topCompanies: TopCompanyRow[];
-};
-
-type GovernmentOfficeRow = {
-  id: number;
-  name: string;
+type GovernmentOfficeSummary = {
+  officeId: number;
+  officeName: string;
   prestige: number;
   holderId: number | null;
   holderName: string | null;
-  fitScore: number | null; // 0–100 if holder exists
-  termYearsRemaining: number | null; // null if unknown
+  fitScore: number | null;
+  termYearsRemaining: number | null;
+};
+
+type CountryPerformanceSummary = {
+  year: number;
+  totalScore: number;
+  companyScore: number;
+  governmentScore: number;
+  populationScore: number;
+  rank?: number | null;
+  champion?: boolean | null;
 };
 
 type PlayerCountryPayload = {
@@ -49,501 +45,535 @@ type PlayerCountryPayload = {
   schools: number;
   employed: number;
   unemployed: number;
-  offices: GovernmentOfficeRow[];
-  // New: optional performance summary
+  offices: GovernmentOfficeSummary[];
   performance?: CountryPerformanceSummary | null;
-  // NEW: ids so we can scope Talent Search
-  worldId?: number;
-  countryId?: number;
+  worldId: number;
+  countryId: number;
 };
 
-type OfficeCandidate = {
+type StandingsRow = {
+  countryId: number;
+  countryName: string;
+  rank: number;
+  totalScore: number;
+  companyScore: number;
+  governmentScore: number;
+  populationScore: number;
+  rankChange?: number | null;
+};
+
+type StandingsResponse = {
+  year: number;
+  countries: StandingsRow[];
+};
+
+type YouthProspect = {
   id: number;
   name: string;
   age: number;
-  fitScore: number | null;
-  currentOfficeName: string | null;
-  isCurrentHolder: boolean;
+  potentialOverall: number;
+  prospectScore: number;
+  prospectGrade: string;
+  educationLabel: string;
 };
 
-export default function PlayerCountryPage() {
-  const [data, setData] = useState<PlayerCountryPayload | null>(null);
+type YouthResponse = {
+  youthMinAge: number;
+  youthMaxAge: number;
+  prospects: YouthProspect[];
+};
+
+export default function PlayerDashboardPage() {
+  const [player, setPlayer] = useState<PlayerCountryPayload | null>(null);
+  const [standings, setStandings] = useState<StandingsRow[] | null>(null);
+  const [youth, setYouth] = useState<YouthProspect[] | null>(null);
   const [loading, setLoading] = useState(true);
-
-  // office reassignment modal state
-  const [selectedOffice, setSelectedOffice] =
-    useState<GovernmentOfficeRow | null>(null);
-  const [candidates, setCandidates] = useState<OfficeCandidate[] | null>(null);
-  const [modalError, setModalError] = useState<string | null>(null);
-  const [modalLoading, setModalLoading] = useState(false);
-  const [appointing, setAppointing] = useState(false);
-
-  // Talent Search modal state
-  const [showTalentSearch, setShowTalentSearch] = useState(false);
-
-  const load = async () => {
-    try {
-      setLoading(true);
-      const res = await fetch('/api/player-country');
-      const json = await res.json();
-      setData(json);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [standingsLoading, setStandingsLoading] = useState(false);
+  const [youthLoading, setYouthLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [talentOpen, setTalentOpen] = useState(false);
 
   useEffect(() => {
-    load();
+    let cancelled = false;
+
+    async function fetchPlayer() {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const res = await fetch("/api/player-country");
+        const json = (await res.json()) as PlayerCountryPayload & {
+          error?: string;
+        };
+
+        if (!res.ok || (json as any).error) {
+          throw new Error((json as any).error || "Failed to load player country");
+        }
+
+        if (!cancelled) {
+          setPlayer(json);
+        }
+      } catch (e: any) {
+        if (!cancelled) {
+          setError(e?.message ?? "Failed to load player dashboard");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    fetchPlayer();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  if (loading) return <main className="p-4">Loading country…</main>;
-  if (!data || (data as any).error) {
-    return <main className="p-4">No controlled country found.</main>;
+  useEffect(() => {
+    if (!player) return;
+    let cancelled = false;
+
+    async function fetchStandings() {
+      try {
+        setStandingsLoading(true);
+        const res = await fetch(`/api/world/${player.worldId}/standings`);
+        if (!res.ok) return;
+        const json = (await res.json()) as StandingsResponse;
+        if (!cancelled) {
+          setStandings(json.countries);
+        }
+      } catch {
+        // ignore
+      } finally {
+        if (!cancelled) setStandingsLoading(false);
+      }
+    }
+
+    fetchStandings();
+    return () => {
+      cancelled = true;
+    };
+  }, [player]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchYouth() {
+      try {
+        setYouthLoading(true);
+        const res = await fetch("/api/player/youth");
+        if (!res.ok) return;
+        const json = (await res.json()) as YouthResponse;
+        if (!cancelled) {
+          const top3 = [...json.prospects].slice(0, 3);
+          setYouth(top3);
+        }
+      } catch {
+        // ignore
+      } finally {
+        if (!cancelled) setYouthLoading(false);
+      }
+    }
+
+    fetchYouth();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const controlledStanding = useMemo(() => {
+    if (!player || !standings) return null;
+    return standings.find((s) => s.countryId === player.countryId) ?? null;
+  }, [player, standings]);
+
+  const headlines = useMemo(() => {
+    if (!player) return [];
+    const items: { tag: string; text: string }[] = [];
+
+    if (player.performance) {
+      const p = player.performance;
+
+      const totalLabel =
+        typeof p.totalScore === "number" && Number.isFinite(p.totalScore)
+          ? Math.round(p.totalScore)
+          : "—";
+
+      if (p.champion) {
+        items.push({
+          tag: "CHAMPION",
+          text: `${player.name} is the reigning world champion this year.`,
+        });
+      } else if (typeof p.rank === "number") {
+        items.push({
+          tag: "STANDING",
+          text: `${player.name} is currently ranked #${p.rank} in the world.`,
+        });
+      } else {
+        items.push({
+          tag: "SEASON",
+          text: `${player.name} is competing this year with total score ${totalLabel}.`,
+        });
+      }
+
+      if (p.governmentScore >= 70) {
+        items.push({
+          tag: "GOVERNMENT",
+          text: "Strong cabinet: government score is a major asset this season.",
+        });
+      } else if (p.governmentScore > 0) {
+        items.push({
+          tag: "GOVERNMENT",
+          text: "Government performance is middling — cabinet changes may help.",
+        });
+      }
+    }
+
+    if (youth && youth.length > 0) {
+      const best = youth[0];
+      items.push({
+        tag: "PROSPECT",
+        text: `${best.name} (${best.age}) is emerging as a top prospect (${best.prospectGrade}, ${best.potentialOverall} potential).`,
+      });
+    }
+
+    return items;
+  }, [player, youth]);
+
+  if (loading) {
+    return (
+      <div className="py-8 text-sm text-gray-600">
+        Loading player dashboard…
+      </div>
+    );
   }
 
-  const perf = data.performance ?? null;
+  if (error || !player) {
+    return (
+      <div className="py-8 text-sm text-red-600">
+        {error ?? "Failed to load player dashboard."}
+      </div>
+    );
+  }
 
-  const formatFitScore = (score: number | null) =>
-    score == null ? '—' : `${Math.round(score)}/100`;
-
-  const formatTermRemaining = (termYearsRemaining: number | null) => {
-    if (termYearsRemaining == null) return '—';
-    if (termYearsRemaining <= 0) return 'Term ending';
-    if (termYearsRemaining === 1) return '1 year left';
-    return `${termYearsRemaining} years left`;
-  };
-
-  const openReassignModal = async (office: GovernmentOfficeRow) => {
-    setSelectedOffice(office);
-    setModalError(null);
-    setCandidates(null);
-    setModalLoading(true);
-
-    try {
-      const res = await fetch(`/api/player/offices/${office.id}/candidates`);
-      const json = await res.json();
-      if (!res.ok || json.error) {
-        setModalError(json.error || 'Failed to load candidates');
-        setCandidates([]);
-      } else {
-        setCandidates(json.candidates as OfficeCandidate[]);
-      }
-    } catch (err) {
-      console.error(err);
-      setModalError('Failed to load candidates');
-      setCandidates([]);
-    } finally {
-      setModalLoading(false);
-    }
-  };
-
-  const closeReassignModal = () => {
-    setSelectedOffice(null);
-    setCandidates(null);
-    setModalError(null);
-    setModalLoading(false);
-    setAppointing(false);
-  };
-
-  const handleAppoint = async (candidateId: number) => {
-    if (!selectedOffice) return;
-
-    setAppointing(true);
-    setModalError(null);
-
-    try {
-      const res = await fetch(
-        `/api/player/offices/${selectedOffice.id}/appoint`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ personId: candidateId }),
-        },
-      );
-
-      const json = await res.json();
-      if (!res.ok || json.error) {
-        setModalError(json.error || 'Failed to appoint officeholder');
-        setAppointing(false);
-        return;
-      }
-
-      // Refresh player-country data so the government card updates
-      await load();
-      closeReassignModal();
-    } catch (err) {
-      console.error(err);
-      setModalError('Failed to appoint officeholder');
-      setAppointing(false);
-    }
-  };
+  const perf = player.performance;
 
   return (
-    <main className="p-4 space-y-6">
-      <header className="space-y-1">
-        <h1 className="text-2xl font-bold">{data.name}</h1>
-        <p className="text-sm text-gray-600">World: {data.worldName}</p>
-
-        <nav className="mt-2 flex items-center gap-3 text-sm">
-          <span className="px-2 py-1 rounded bg-blue-600 text-white">
-            Overview
-          </span>
-          <Link
-            href="/player/youth"
-            className="px-2 py-1 rounded border border-gray-300 bg-gray-50 hover:bg-gray-100"
+    <>
+      <SectionHeader
+        title={`${player.name} — Country Dashboard`}
+        description={`${player.worldName} · Managed country overview, performance, youth pipeline, and government.`}
+        action={
+          <button
+            className="text-xs text-blue-600 hover:underline"
+            onClick={() => setTalentOpen(true)}
           >
-            Youth Pipeline
-          </Link>
-        </nav>
-      </header>
+            Open Talent Search
+          </button>
+        }
+      />
 
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
+        {/* LEFT COLUMN: mini-standings + summary */}
+        <div className="lg:col-span-1 space-y-3">
+          <Panel>
+            <PanelHeader
+              title="Mini Standings"
+              action={
+                <Link
+                  href={`/world/${player.worldId}/standings`}
+                  className="text-[11px] text-blue-600 hover:underline"
+                >
+                  View all
+                </Link>
+              }
+            />
+            {standingsLoading && (
+              <p className="text-xs text-gray-500">Loading standings…</p>
+            )}
+            {!standingsLoading && standings && standings.length > 0 ? (
+              <Table dense>
+                <TableHead>
+                  <tr>
+                    <Th>#</Th>
+                    <Th>Country</Th>
+                    <Th align="right">Total</Th>
+                  </tr>
+                </TableHead>
+                <TableBody>
+                  {standings.slice(0, 6).map((row) => {
+                    const isYou = row.countryId === player.countryId;
+                    return (
+                      <TableRow key={row.countryId} highlight={isYou}>
+                        <Td className="text-[11px] text-gray-600">
+                          {row.rank}
+                        </Td>
+                        <Td>
+                          <span
+                            className={
+                              "truncate text-xs " +
+                              (isYou
+                                ? "font-semibold text-blue-800"
+                                : "text-gray-800")
+                            }
+                          >
+                            {row.countryName}
+                          </span>
+                        </Td>
+                        <Td
+                          align="right"
+                          className="font-mono text-[11px] text-gray-700"
+                        >
+                          {Math.round(row.totalScore)}
+                        </Td>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            ) : !standingsLoading ? (
+              <p className="text-xs text-gray-500">
+                Standings are not available yet. Sim a year to generate standings.
+              </p>
+            ) : null}
+          </Panel>
 
-      {/* Basic overview */}
-      <section>
-        <h2 className="text-xl font-semibold">Overview</h2>
-        <ul className="list-disc ml-6 text-sm">
-          <li>Population: {data.population}</li>
-          <li>Companies: {data.companies}</li>
-          <li>Schools: {data.schools}</li>
-          <li>Employed: {data.employed}</li>
-          <li>Unemployed: {data.unemployed}</li>
-        </ul>
-      </section>
-
-      {/* Talent & Scouting entry point */}
-      <section className="border rounded-lg p-4 bg-white shadow-sm flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold">Talent &amp; Scouting</h2>
-          <p className="text-sm text-gray-600">
-            Search your population (and beyond) by age, stats, and industry
-            experience to find candidates for offices and company roles.
-          </p>
+          {controlledStanding && (
+            <Panel variant="subtle" padding="sm">
+              <PanelHeader title="Your Standing" size="sm" />
+              <p className="text-xs text-gray-700 mb-1">
+                Ranked{" "}
+                <span className="font-semibold">
+                  #{controlledStanding.rank}
+                </span>{" "}
+                out of {standings?.length ?? "?"} countries.
+              </p>
+              <p className="text-[11px] text-gray-600">
+                Total {Math.round(controlledStanding.totalScore)} · Company{" "}
+                {Math.round(controlledStanding.companyScore)} · Government{" "}
+                {Math.round(controlledStanding.governmentScore)}
+              </p>
+            </Panel>
+          )}
         </div>
-        <button
-          className="px-3 py-1.5 rounded border border-blue-600 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 disabled:opacity-50"
-          onClick={() => setShowTalentSearch(true)}
-          disabled={!data.worldId}
-        >
-          Open Talent Search
-        </button>
-      </section>
 
-      {/* Government overview card */}
-      <section className="border rounded-lg p-4 bg-white shadow-sm space-y-4">
-        <div className="flex items-baseline justify-between">
-          <h2 className="text-xl font-semibold">Government</h2>
-          <span className="text-xs text-gray-500">
-            Key offices &amp; leadership quality
-          </span>
-        </div>
+        {/* CENTER COLUMN */}
+        <div className="lg:col-span-2 space-y-4">
+          <Panel>
+            <PanelHeader title="Country Overview" />
+            <PanelBody className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
+              <OverviewStat label="Population" value={player.population} />
+              <OverviewStat label="Companies" value={player.companies} />
+              <OverviewStat label="Schools" value={player.schools} />
+              <OverviewStat
+                label="Employed"
+                value={`${player.employed} (${Math.round(
+                  (player.employed / Math.max(player.population, 1)) * 100,
+                )}% of population)`}
+              />
+              <OverviewStat
+                label="Unemployed"
+                value={`${player.unemployed} (${Math.round(
+                  (player.unemployed / Math.max(player.population, 1)) * 100,
+                )}% of population)`}
+              />
+            </PanelBody>
+          </Panel>
 
-        {data.offices.length === 0 ? (
-          <p className="text-sm text-gray-600">
-            No government offices defined for this country yet.
-          </p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm border border-gray-200">
-              <thead className="bg-gray-50 text-xs uppercase text-gray-500">
-                <tr>
-                  <th className="px-2 py-1 text-left border-b">Office</th>
-                  <th className="px-2 py-1 text-left border-b">Holder</th>
-                  <th className="px-2 py-1 text-right border-b">Fit</th>
-                  <th className="px-2 py-1 text-right border-b">Term</th>
-                  <th className="px-2 py-1 text-right border-b">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.offices.map((o) => (
-                  <tr
-                    key={o.id}
-                    className="odd:bg-white even:bg-gray-50 border-b last:border-0"
-                  >
-                    <td className="px-2 py-1 align-top">
-                      <Link
-                        href={`/office/${o.id}`}
-                        className="font-medium text-blue-600 hover:underline"
-                      >
-                        {o.name}
-                      </Link>
-                      {o.prestige > 0 && (
-                        <span className="ml-1 text-xs text-gray-400">
-                          (Prestige {o.prestige})
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-2 py-1 align-top">
-                      {o.holderId && o.holderName ? (
+          <Panel>
+            <PanelHeader
+              title={`Performance${perf ? ` — Year ${perf.year}` : ""}`}
+              action={
+                <Link
+                  href={`/country/${player.countryId}`}
+                  className="text-[11px] text-blue-600 hover:underline"
+                >
+                  View country history
+                </Link>
+              }
+            />
+            {perf ? (
+              <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-4">
+                <OverviewStat
+                  label="Total score"
+                  value={Math.round(perf.totalScore)}
+                  big
+                  highlight={perf.champion === true}
+                  note={
+                    perf.champion
+                      ? "World champion this year"
+                      : typeof perf.rank === "number"
+                      ? `Rank #${perf.rank}`
+                      : undefined
+                  }
+                />
+                <OverviewStat
+                  label="Company score"
+                  value={Math.round(perf.companyScore)}
+                  note="Sum of company output"
+                />
+                <OverviewStat
+                  label="Government score"
+                  value={Math.round(perf.governmentScore)}
+                  note="Cabinet effectiveness"
+                />
+                <OverviewStat
+                  label="Population score"
+                  value={Math.round(perf.populationScore)}
+                  note="Future demographic systems"
+                />
+              </div>
+            ) : (
+              <p className="text-xs text-gray-600">
+                No performance records yet. Sim a year to generate company and
+                country scores.
+              </p>
+            )}
+          </Panel>
+
+          <Panel>
+            <PanelHeader
+              title="Youth Pipeline"
+              action={
+                <Link
+                  href="/player/youth"
+                  className="text-[11px] text-blue-600 hover:underline"
+                >
+                  View full pipeline
+                </Link>
+              }
+            />
+            {youthLoading && (
+              <p className="text-xs text-gray-600">Loading prospects…</p>
+            )}
+
+            {!youthLoading && youth && youth.length > 0 ? (
+              <Table dense>
+                <TableHead>
+                  <tr>
+                    <Th>Prospect</Th>
+                    <Th>Age</Th>
+                    <Th>Education</Th>
+                    <Th align="right">Grade</Th>
+                  </tr>
+                </TableHead>
+                <TableBody>
+                  {youth.map((p) => (
+                    <TableRow key={p.id}>
+                      <Td>
                         <Link
-                          href={`/person/${o.holderId}`}
+                          href={`/person/${p.id}`}
                           className="text-blue-600 hover:underline"
                         >
-                          {o.holderName}
+                          {p.name}
                         </Link>
-                      ) : (
-                        <span className="text-gray-400">Vacant</span>
-                      )}
-                    </td>
-                    <td className="px-2 py-1 text-right align-top text-xs">
-                      {formatFitScore(o.fitScore)}
-                    </td>
-                    <td className="px-2 py-1 text-right align-top text-xs text-gray-600">
-                      {formatTermRemaining(o.termYearsRemaining)}
-                    </td>
-                    <td className="px-2 py-1 text-right align-top text-xs">
-                      <button
-                        className="px-2 py-1 border rounded text-xs bg-blue-50 hover:bg-blue-100 text-blue-700"
-                        onClick={() => openReassignModal(o)}
-                      >
-                        Reassign
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-
-      {/* Country performance panel */}
-      <section className="border rounded-lg p-4 bg-white shadow-sm space-y-4">
-        <h2 className="text-xl font-semibold">Country Performance</h2>
-
-        {!perf || perf.overall.numCompanies === 0 ? (
-          <p className="text-sm text-gray-600">
-            No performance data yet for this country — simulate a year to see
-            results.
-          </p>
-        ) : (
-          <>
-            {/* Overall summary */}
-            <div className="space-y-1">
-              <p className="text-sm font-medium">
-                Year {perf.year} performance:
-                <span className="ml-1 text-base font-semibold">
-                  {perf.overall.totalOutput.toFixed(1)}
-                </span>
-              </p>
+                      </Td>
+                      <Td>{p.age}</Td>
+                      <Td>{p.educationLabel}</Td>
+                      <Td align="right">
+                        {p.prospectGrade} ({Math.round(p.prospectScore)})
+                      </Td>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : !youthLoading ? (
               <p className="text-xs text-gray-600">
-                Companies with performance:{' '}
-                <span className="font-medium">
-                  {perf.overall.numCompanies}
-                </span>{' '}
-                · Average output per company:{' '}
-                <span className="font-medium">
-                  {perf.overall.averageOutput === null
-                    ? '—'
-                    : perf.overall.averageOutput.toFixed(1)}
-                </span>
+                No youth prospects surfaced yet. Sim a few years for teenagers to
+                appear.
               </p>
-            </div>
-
-            {/* Per-industry table */}
-            <div className="pt-2">
-              <h3 className="text-sm font-medium mb-2">
-                Performance by industry
-              </h3>
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-xs border border-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-2 py-1 text-left border-b">
-                        Industry
-                      </th>
-                      <th className="px-2 py-1 text-right border-b">
-                        Companies
-                      </th>
-                      <th className="px-2 py-1 text-right border-b">
-                        Total Output
-                      </th>
-                      <th className="px-2 py-1 text-right border-b">
-                        Avg Output
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {perf.industries.map((ind) => (
-                      <tr
-                        key={ind.industry}
-                        className="odd:bg-white even:bg-gray-50"
-                      >
-                        <td className="px-2 py-1 border-b">
-                          {ind.industry}
-                        </td>
-                        <td className="px-2 py-1 text-right border-b">
-                          {ind.numCompanies}
-                        </td>
-                        <td className="px-2 py-1 text-right border-b">
-                          {ind.totalOutput.toFixed(1)}
-                        </td>
-                        <td className="px-2 py-1 text-right border-b">
-                          {ind.averageOutput === null
-                            ? '—'
-                            : ind.averageOutput.toFixed(1)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Top companies list */}
-            <div className="pt-2">
-              <h3 className="text-sm font-medium mb-2">Top companies</h3>
-              {perf.topCompanies.length === 0 ? (
-                <p className="text-xs text-gray-600">
-                  No companies with performance this year.
-                </p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full text-xs border border-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-2 py-1 text-left border-b">
-                          Company
-                        </th>
-                        <th className="px-2 py-1 text-left border-b">
-                          Industry
-                        </th>
-                        <th className="px-2 py-1 text-right border-b">
-                          Output
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {perf.topCompanies.map((c) => (
-                        <tr
-                          key={c.companyId}
-                          className="odd:bg-white even:bg-gray-50"
-                        >
-                          <td className="px-2 py-1 border-b">
-                            <Link
-                              href={`/company/${c.companyId}`}
-                              className="text-blue-600 hover:underline"
-                            >
-                              {c.name}
-                            </Link>
-                          </td>
-                          <td className="px-2 py-1 border-b">{c.industry}</td>
-                          <td className="px-2 py-1 text-right border-b">
-                            {c.outputScore.toFixed(1)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </>
-        )}
-      </section>
-
-      {/* Reassign Office Modal */}
-      {selectedOffice && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-lg shadow-lg w-full max-w-lg p-4 space-y-3">
-            <div className="flex items-baseline justify-between">
-              <h3 className="text-lg font-semibold">
-                Reassign {selectedOffice.name}
-              </h3>
-              <button
-                className="text-xs text-gray-500 hover:text-gray-800"
-                onClick={closeReassignModal}
-              >
-                Close
-              </button>
-            </div>
-
-            {modalError && (
-              <p className="text-xs text-red-600">{modalError}</p>
-            )}
-
-            {modalLoading && (
-              <p className="text-sm text-gray-600">Loading candidates…</p>
-            )}
-
-            {!modalLoading && candidates && candidates.length === 0 && (
-              <p className="text-sm text-gray-600">
-                No eligible candidates available for this office.
-              </p>
-            )}
-
-            {!modalLoading && candidates && candidates.length > 0 && (
-              <div className="max-h-64 overflow-y-auto border rounded">
-                <table className="min-w-full text-xs">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-2 py-1 text-left border-b">Name</th>
-                      <th className="px-2 py-1 text-right border-b">Age</th>
-                      <th className="px-2 py-1 text-right border-b">Fit</th>
-                      <th className="px-2 py-1 text-right border-b">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {candidates.map((c) => (
-                      <tr
-                        key={c.id}
-                        className="odd:bg-white even:bg-gray-50 border-b last:border-0"
-                      >
-                        <td className="px-2 py-1">
-                          {c.name}
-                          {c.isCurrentHolder && (
-                            <span className="ml-1 text-[10px] text-gray-400">
-                              (current)
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-2 py-1 text-right">{c.age}</td>
-                        <td className="px-2 py-1 text-right">
-                          {c.fitScore == null
-                            ? '—'
-                            : `${Math.round(c.fitScore)}/100`}
-                        </td>
-                        <td className="px-2 py-1 text-right">
-                          <button
-                            className="px-2 py-1 border rounded text-[11px] bg-blue-50 hover:bg-blue-100 text-blue-700 disabled:opacity-50"
-                            disabled={appointing}
-                            onClick={() => handleAppoint(c.id)}
-                          >
-                            {appointing ? 'Appointing…' : 'Appoint'}
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            <p className="text-[11px] text-gray-500">
-              Manual appointments are treated as player overrides and will not
-              be replaced by auto elections while active.
-            </p>
-          </div>
+            ) : null}
+          </Panel>
         </div>
-      )}
 
-      {/* Talent Search Modal (global scouting) */}
-      {data.worldId && (
-        <TalentSearchModal
-          worldId={data.worldId}
-          defaultCountryId={data.countryId}
-          isOpen={showTalentSearch}
-          onClose={() => setShowTalentSearch(false)}
-          onSelectPerson={(person) => {
-            // For now, just open their profile in a new tab
-            window.open(`/person/${person.id}`, '_blank');
-          }}
-          selectLabel="View profile"
-        />
-      )}
+        {/* RIGHT COLUMN */}
+        <div className="lg:col-span-1 space-y-4">
+          <GovernmentCard offices={player.offices} />
 
-      {/* Later: policy sliders, budgets, etc. */}
-    </main>
+          <Panel>
+            <PanelHeader
+              title="Headlines"
+              subtitle="Season recap & story hooks"
+            />
+            {headlines.length === 0 ? (
+              <p className="text-xs text-gray-600">
+                Sim a few years to generate meaningful stories about your country.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {headlines.map((h, idx) => (
+                  <HeadlineCard key={`${h.tag}-${idx}`} tag={h.tag} text={h.text} />
+                ))}
+              </div>
+            )}
+          </Panel>
+        </div>
+      </div>
+
+      <TalentSearchModal
+        worldId={player.worldId}
+        defaultCountryId={player.countryId}
+        isOpen={talentOpen}
+        onClose={() => setTalentOpen(false)}
+      />
+    </>
+  );
+}
+
+type OverviewStatProps = {
+  label: string;
+  value: number | string | null | undefined;
+  big?: boolean;
+  highlight?: boolean;
+  note?: string;
+};
+
+function OverviewStat({ label, value, big, highlight, note }: OverviewStatProps) {
+  let display: string | number;
+
+  if (typeof value === "number") {
+    display = Number.isFinite(value) ? value : "—";
+  } else if (value == null) {
+    display = "—";
+  } else {
+    display = value;
+  }
+
+  return (
+    <div className="flex flex-col rounded-md border border-gray-200 bg:white/60 px-2 py-2">
+      <span className="text-[11px] font-medium text-gray-500">{label}</span>
+      <span
+        className={
+          "mt-0.5 font-semibold text-gray-900 " +
+          (big ? "text-base" : "text-sm") +
+          (highlight ? " text-blue-700" : "")
+        }
+      >
+        {display}
+      </span>
+      {note && (
+        <span className="mt-0.5 text-[11px] text-gray-500">{note}</span>
+      )}
+    </div>
+  );
+}
+
+type HeadlineCardProps = {
+  tag: string;
+  text: string;
+};
+
+function HeadlineCard({ tag, text }: HeadlineCardProps) {
+  const variant =
+    tag === "CHAMPION"
+      ? "warning"
+      : tag === "PROSPECT"
+      ? "success"
+      : tag === "GOVERNMENT"
+      ? "info"
+      : "neutral";
+
+  return (
+    <div className="flex items-start gap-2 rounded-md border border-gray-200 bg-[#fafafa] px-2 py-2">
+      <StatBadge label={tag} variant={variant} />
+      <p className="text-xs text-gray-800">{text}</p>
+    </div>
   );
 }

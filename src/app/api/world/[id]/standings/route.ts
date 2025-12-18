@@ -8,7 +8,7 @@ export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const { id } = await params; // 👈 await the promise
+  const { id } = await params; // await the promise
 
   const worldIdParam = Number(id);
   const worldId = Number.isFinite(worldIdParam) ? worldIdParam : NaN;
@@ -65,6 +65,7 @@ export async function GET(
           id: world.id,
           name: world.name,
           currentYear,
+          controlledCountryId: world.controlledCountryId ?? null,
         },
         standings: [],
       },
@@ -177,9 +178,15 @@ export async function GET(
         id: world.id,
         name: world.name,
         currentYear,
+        controlledCountryId: world.controlledCountryId ?? null,
       },
-      standings,
+      worldId: world.id,
+      year: currentYear,
+      playerCountryId: world.controlledCountryId ?? null,
+      countries: standings,
+      standings, // keep old key for any existing callers
     },
     { status: 200 },
   );
 }
+

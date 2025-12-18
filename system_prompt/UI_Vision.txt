@@ -1,0 +1,678 @@
+🌍 WORLD SIM BBGM — UI VISION DOCUMENT (v1.1)
+
+A unifying design guide for the visual identity, layout structure, and UI components of the World Sim BBGM interface.
+
+Last updated: BBGM “single-sheet” layout adoption
+
+1. UI Philosophy
+
+World Sim BBGM inherits its design identity from Basketball GM. The UI should feel like a single dense sheet of information, not a collection of floating cards.
+
+Core principles:
+
+Data-forward – Tables, stats, and text-first presentation. Numbers and lists are the primary visual elements.
+
+Dense layout – Minimal whitespace, compact rows, small fonts. Everything important is visible at once.
+
+Flat, single-sheet design – One white content surface with sections and tables, not lots of rounded panels.
+
+Zero-friction navigation – Side nav + top nav, predictable locations for important links.
+
+Fast scanning – Strong page titles, small section headings, consistent ordering of sections.
+
+BBGM-like, not BBGM-cloned – Match structure, density, and flow; don’t copy assets or artwork.
+
+Consistency > decoration – A few well-defined patterns used everywhere.
+
+Utility-first – The user should feel like a GM managing a country via numbers, not like a casual app user.
+
+This document defines how layouts, typography, and shared components work to support that philosophy.
+
+2. Global Layout Model
+
+All major pages share a consistent UI shell:
+
+2.1 Top Navigation Bar
+
+Appears on every page.
+
+Content
+
+Left:
+
+Game emoji/logo (🌍 for now)
+
+“World Sim BBGM” title, linking to /
+
+Center:
+
+Current world name
+
+Current simulated year (e.g., “SimWorld 1 · Year 8”)
+
+Right:
+
+Button: Sim 1 Year
+
+Button: Reset World
+
+Link: My Country (/player)
+
+Search icon (global person/company search; can stub initially)
+
+Style
+
+Background: white
+
+Height: ~48px
+
+Bottom border: 1px solid #ddd
+
+Font size: 12–14px
+
+No shadows; flat.
+
+2.2 Left Sidebar Navigation
+
+Used on all game pages.
+
+Sections and Links
+
+WORLD
+
+Standings
+
+Top Companies
+
+History (future)
+
+Awards (future)
+
+Events (future)
+
+COUNTRY
+
+Dashboard (/player)
+
+Industries
+
+Country History
+
+Government (future)
+
+Finances (future)
+
+PEOPLE
+
+Youth Pipeline
+
+Leaders
+
+People Search (future)
+
+Notable Families (future)
+
+COMPANIES
+
+All Companies
+
+Industry Leaders (future)
+
+Ranking Charts (future)
+
+Style
+
+Width: ~220–240px
+
+Background: white
+
+Right border: 1px solid #ddd
+
+Section headers: all-caps, 11px, medium weight, grey (#777)
+
+Links: 12–13px; active state blue background; hover subtle grey.
+
+2.3 Main Content “Sheet”
+
+All content to the right of the sidebar sits in a single centered white sheet, like BBGM:
+
+Outer page background: light grey #f2f2f2
+
+Inner content: max-w-6xl white container
+
+Vertical padding: 12–16px
+
+Horizontal padding: 12–16px
+
+Optional vertical borders: border-x border-gray-200
+
+All sections (standings, snapshot, headlines, etc.) live directly on this sheet. We generally avoid wrapping them in separate cards or panels.
+
+2.4 Page Types
+
+Every page uses one of these sheet layouts:
+
+A. Dashboard Layout (3-column)
+
+Used for:
+
+/ (world overview)
+
+/player (controlled country dashboard)
+
+Future league/country dashboards
+
+Columns
+
+Left: mini-standings, context tables, quick links
+
+Center: main dashboard content (scores, stats, leaders)
+
+Right: headlines, news/events, quick facts
+
+Grid
+
+Desktop: grid-cols-12
+
+Left: col-span-3
+
+Center: col-span-6
+
+Right: col-span-3
+
+On smaller screens, columns stack.
+
+B. Two-Column Layout
+
+Used for:
+
+Company page
+
+Person page
+
+Country page
+
+Columns
+
+Left (main): performance tables, attributes, charts, timelines
+
+Right (sidebar): quick facts, depth charts, small summaries
+
+Grid
+
+Left: col-span-8
+
+Right: col-span-4
+
+C. Full-Width Table Layout
+
+Used when the entire view is a list:
+
+Standings
+
+Rankings
+
+Awards lists
+
+Top companies
+
+Spec
+
+Content sheet still used, but a single column
+
+Margins: 12–24px inside the sheet
+
+Table fills available width.
+
+3. Component Library (UI System)
+
+We still use shared components, but cards/panels are no longer the default building block. The default look is flat sections + tables.
+
+3.1 Flat Section Pattern (Default)
+
+The canonical building block is:
+
+A section heading
+
+Optional subtext
+
+One or more tables or short lists
+
+Example:
+
+Heading: “World snapshot”
+
+Subtext: “Key indicators for Year 8”
+
+Content: definition list, small stat blocks, buttons.
+
+Style
+
+Heading: 12px, semi-bold, normal case (NOT all caps)
+
+Subtext: 11px, grey (#777)
+
+Section spacing: 8–16px between sections
+
+No surrounding card; background is the page sheet.
+
+3.2 Panel / Card Component (Secondary)
+
+Panels are special-purpose, not default layout. Use them sparingly when:
+
+Content must pop from surrounding noise (e.g., headlines, alerts)
+
+A bounded area makes the UI clearer (e.g., modal, popover, sidebox)
+
+Style
+
+Background: white
+
+Border: 1px solid #ddd
+
+Border radius: 4–6px
+
+Padding: 8–12px
+
+No heavy shadows (light or none)
+
+Rules:
+
+Avoid nesting panels (no >1 level deep)
+
+Do not wrap whole pages in a grid of panels; rely on flat sections instead.
+
+3.3 Table Component (Primary)
+
+Tables are the core of the UI.
+
+Appearance
+
+Font size: 12px
+
+Row height: compact (24–30px)
+
+Background: white
+
+Row striping: optional and subtle; single background is fine
+
+Row border: 1px solid #eee or lighter
+
+Header:
+
+11px, uppercase or small caps
+
+Bold or semi-bold
+
+Bottom border stronger than row borders
+
+Numbers right-aligned, names left-aligned
+
+Interaction
+
+Cell text links where appropriate (countries, companies, people)
+
+Clicking a row may navigate to a detail page; if so, cursor should indicate clickability.
+
+Optional sort by clicking headers (future)
+
+Tables should feel exactly like BBGM: tight, informative, un-fancy.
+
+3.4 Depth Chart / Hierarchy Component
+
+Used for:
+
+Company hierarchies
+
+Government offices
+
+Org charts
+
+Structure
+
+One row per role
+
+Columns:
+
+Role name
+
+Person name (link)
+
+Fit / rating badge
+
+Optional lock/flag icon
+
+Style
+
+Effectively a thin table
+
+Row height: 26–30px
+
+No heavy card; usually just heading + table.
+
+3.5 Headline Card
+
+Used mainly in right-hand dashboard columns.
+
+Content types
+
+Awards
+
+Promotions / hirings
+
+Retirements
+
+Champions / titles
+
+Major events (future)
+
+Visual
+
+Small bordered box in a vertical list
+
+Optional avatar/icon on the left; text to the right
+
+Tag badges (color-coded) for Award / Retirement / Movement, etc.
+
+Text is 11–12px, two lines max
+
+These are one of the few legitimate “card-like” elements that stand apart from flat tables.
+
+3.6 Tabs Component (Future)
+
+Tabs across top of detail views:
+
+Overview
+
+History
+
+Ratings / Stats
+
+Roles
+
+Events (future)
+
+Style
+
+Text-only tabs
+
+No big cards; active tab underlined and slightly bolder
+
+Tab bar sits directly on the white sheet.
+
+3.7 Typography Rules
+
+Headings
+
+Page title: 18–20px, bold
+
+Major section titles: 12px, semi-bold
+
+Label text (table headers, small labels): 11px
+
+Body
+
+Main body text: 12–13px
+
+Table rows: 12px
+
+Subtext / captions: 11px, grey (#777)
+
+Line height: tight (1.2–1.3)
+
+Typography should always favor readability at high density over big, airy text.
+
+3.8 Color Palette
+Use case	Color
+Outer background	#f2f2f2
+Content sheet background	#ffffff
+Borders	#dddddd (headers), #eeeeee (rows)
+Hover row	#eef3ff
+Text primary	#222222
+Text secondary	#555555
+Links	#0066cc (underline on hover)
+Positive / up arrow	#10b981
+Negative / down arrow	#ef4444
+Warning badge	#facc15
+
+Muted colors, no gradients. Visual interest comes from data, not theming.
+
+3.9 Spacing System
+
+Use a small-scale spacing system:
+
+XS: 2–4px (between text and labels)
+
+SM: 6–8px (between heading and content)
+
+MD: 12px (between sections)
+
+LG: 16px (between major blocks / columns)
+
+Avoid big blank bands of whitespace. The UI should feel compact and purposeful.
+
+4. Page-by-Page Vision (Blueprint)
+4.1 / — World Overview Dashboard
+
+Single-sheet, 3-column layout:
+
+Left (col-span-3)
+
+“Standings” mini-table:
+
+Rank, Country, Score, Δ
+
+“Countries” bullet list
+
+Center (col-span-6)
+
+“World snapshot”:
+
+Year, Countries, People, Companies
+
+Sim 1 Year / Reset World / My Country buttons
+
+“Top companies this year” table:
+
+Rank, Company, Country, Industry, Output
+
+Right (col-span-3)
+
+“League headlines”:
+
+Small headline cards, 2–3 lines each
+
+“People (sample)” list
+
+No big wrapper cards. Sections are separated by headings and small gaps only.
+
+4.2 /player — Controlled Country Dashboard
+
+Same 3-column skeleton:
+
+Left
+
+Mini standings with controlled country highlighted
+
+Simple schedule / recent results (future)
+
+Center
+
+Big country summary (score and rank) at the top
+
+Stats blocks:
+
+CompanyScore, GovernmentScore, YouthScore, etc.
+
+Tables:
+
+Top companies in this country
+
+Top ministers/executives
+
+Right
+
+Headlines specific to this country
+
+Key events and alerts (e.g., cabinet changes, company bankruptcies)
+
+Again: flat sections over a single sheet.
+
+4.3 /world/[id]/standings
+
+Full-width table page on the sheet.
+
+Main table:
+
+Rank, Country, Total Score, Company Score, Gov Score, Rank Δ
+
+Beneath:
+
+Per-industry summary tables
+
+Optional “Top companies” table
+
+All of this is one continuous scroll, not separate cards.
+
+4.4 /company/[id]
+
+Two-column layout.
+
+Left (main)
+
+Company summary inline (name, industry, country)
+
+Table for current-year performance vs league average
+
+Mini history table (Year, Output, Rank)
+
+Right (sidebar)
+
+Depth chart table (roles → people)
+
+Quick facts: founded year, size, prestige, etc.
+
+Sections are just headings + tables.
+
+4.5 /person/[id]
+
+Two-column layout, BBGM player-page analog.
+
+Left
+
+Name + age header
+
+Attributes grid (cognition, leadership, reliability, personality)
+
+Career tables:
+
+Education history
+
+Employment history
+
+Offices held
+
+Yearly performance line (from PersonYearPerformance)
+
+Right
+
+Quick facts:
+
+Country, industries, potential, prestige, etc.
+
+Small highlight/headline boxes (if awards / championships)
+
+4.6 /country/[id]
+
+Two-column layout.
+
+Left
+
+Country performance over years (table or chart)
+
+Champion markers / rank over time
+
+Industry summary table
+
+Right
+
+Government hierarchy table
+
+Key stats: population, GDP proxy, champions, prestige
+
+5. Interaction Rules
+
+All clickable names (people, companies, countries) are blue and underline on hover.
+
+Table rows with row-level actions should change background on hover.
+
+Up/down changes shown with green ↑ and red ↓.
+
+Sorting by clicking headers is ideal (can be rolled out gradually).
+
+Modals and overlays use a simple, flat card — same palette, no heavy shadows.
+
+6. Future Extensions Supported by This Vision
+
+This “single-sheet + tables” UI easily extends to:
+
+Awards (tables + inline surfacing on player/company/country pages)
+
+Season recap events
+
+International movement and transfers
+
+Prestige curves and titles
+
+Country management menus
+
+Hall of Fame
+
+Long-form news/event feeds
+
+Save/load UI
+
+Because we avoid panel explosion and stick to headings + tables, new features plug in cleanly.
+
+7. Non-Goals
+
+We explicitly are not aiming for:
+
+Fancy card grids everywhere
+
+Large, airy, marketing-style layouts
+
+Heavy animations or transitions
+
+Portrait-heavy player cards (beyond small avatars)
+
+Dark mode (for now)
+
+Mobile-first layouts (desktop is primary; mobile comes later)
+
+Goal: clarity, density, and a GM-simulator feel, not visual flash.
+
+8. Deliverables for UI Sprint 1 (Aligned with This Vision)
+
+For the first UI sprint under this vision:
+
+World layout shell (GameLayout) with:
+
+Top nav
+
+Sidebar
+
+Centered sheet
+
+World overview (/) redesigned to sheet-style 3-column dashboard
+
+Country dashboard (/player) implemented with same pattern
+
+Standings page UI updated to dense full-width table
+
+Shared “flat table” styling for standings, top companies, and leaders
+
+Initial headline cards on world and player dashboards
+
+Once this is in place, every future screen should copy these patterns:
+flat white sheet, tight sections, and table-first design.

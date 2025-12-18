@@ -1,8 +1,10 @@
-// src/app/player/youth/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+
+import { SectionHeader } from '@/components/ui/SectionHeader';
+import { Panel } from '@/components/ui/Panel';
 
 type EducationLevel =
   | 'Primary'
@@ -111,18 +113,16 @@ export default function YouthPipelinePage() {
   };
 
   if (loading) {
-    return <main className="p-4">Loading youth pipeline…</main>;
+    return <main className="px-3 py-4 md:px-4">Loading youth pipeline…</main>;
   }
 
   if (!data || (data as any).error) {
     return (
-      <main className="p-4 space-y-3">
-        <header className="space-y-1">
-          <h1 className="text-2xl font-bold">Youth Pipeline</h1>
-          <p className="text-sm text-gray-600">
-            No controlled country or youth data found.
-          </p>
-        </header>
+      <main className="px-3 py-4 md:px-4 space-y-3">
+        <SectionHeader
+          title="Youth Pipeline"
+          description="No controlled country or youth data found."
+        />
         <Link href="/player" className="text-blue-600 text-sm hover:underline">
           ← Back to player overview
         </Link>
@@ -145,14 +145,12 @@ export default function YouthPipelinePage() {
       : 0;
 
   return (
-    <main className="p-4 space-y-6">
-      <header className="space-y-1">
-        <h1 className="text-2xl font-bold">Youth Pipeline</h1>
-        <p className="text-sm text-gray-600">
-          Teenagers and young adults in your country ({youthMinAge}–{youthMaxAge}{' '}
-          years), sorted by long-term potential.
-        </p>
-
+    <main className="px-3 py-4 md:px-4 md:py-6 space-y-6">
+      <SectionHeader
+        title="Youth Pipeline"
+        eyebrow="Player country"
+        description={`Teenagers and young adults in your country (${youthMinAge}–${youthMaxAge} years), sorted by long-term potential.`}
+      >
         <nav className="mt-2 flex items-center gap-3 text-sm">
           <Link
             href="/player"
@@ -164,29 +162,26 @@ export default function YouthPipelinePage() {
             Youth Pipeline
           </span>
         </nav>
-      </header>
+      </SectionHeader>
 
       {prospects.length === 0 ? (
-        <section>
+        <Panel title="Prospects">
           <p className="text-sm text-gray-600">
             You currently have no youth in this age range. Simulate a few more
             years to grow your talent pool.
           </p>
-        </section>
+        </Panel>
       ) : (
-        <section className="border rounded-lg p-4 bg-white shadow-sm space-y-3">
-          <div className="flex items-baseline justify-between gap-3">
-            <div>
-              <h2 className="text-xl font-semibold">Prospects</h2>
-              <p className="text-xs text-gray-500">
-                {prospects.length} youth in pipeline
-              </p>
+        <Panel
+          title="Prospects"
+          subtitle={`${prospects.length} youth in pipeline`}
+        >
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-baseline sm:justify-between">
+            <div className="text-xs text-gray-600">
+              University admissions for next year (start {currentYear + 1}).
             </div>
 
-            <div className="flex flex-col items-end gap-1 text-xs">
-              <div className="text-gray-600">
-                University admissions for next year (start {currentYear + 1}):
-              </div>
+            <div className="flex flex-col items-start sm:items-end gap-1 text-xs">
               <div className="flex flex-wrap items-center gap-2">
                 {universitySlotsPerYear > 0 ? (
                   <>
@@ -224,7 +219,7 @@ export default function YouthPipelinePage() {
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="mt-4 overflow-x-auto">
             <table className="min-w-full text-xs border border-gray-200">
               <thead className="bg-gray-50 text-[11px] uppercase text-gray-500">
                 <tr>
@@ -320,12 +315,12 @@ export default function YouthPipelinePage() {
             </table>
           </div>
 
-          <p className="text-[11px] text-gray-500">
+          <p className="mt-3 text-[11px] text-gray-500">
             Prospect grade combines potential, cognitive stats, leadership, and
             personality into a single 0–100 score. Use university admissions to
             invest in your best 18-year-olds each year.
           </p>
-        </section>
+        </Panel>
       )}
     </main>
   );

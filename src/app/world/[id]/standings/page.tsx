@@ -1,11 +1,21 @@
-// app/world/[id]/standings/page.tsx
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
-import Link from 'next/link';
+import { useEffect, useMemo, useState } from "react";
+import { useParams } from "next/navigation";
+import Link from "next/link";
 
-type Trend = 'up' | 'down' | 'same' | 'new';
+import { Panel, PanelBody, PanelHeader } from "@/components/ui/Panel";
+import { SectionHeader } from "@/components/ui/SectionHeader";
+import {
+  Table,
+  TableHead,
+  TableBody,
+  TableRow,
+  Th,
+  Td,
+} from "@/components/ui/Table";
+
+type Trend = "up" | "down" | "same" | "new";
 
 type HistoryEntry = {
   year: number;
@@ -27,11 +37,11 @@ type ApiResponse = {
     id: number;
     name: string;
     currentYear: number;
+    controlledCountryId: number | null;
   } | null;
   standings: LeagueStanding[];
 };
 
-// Top companies types (unchanged)
 type TopCompany = {
   companyId: number;
   name: string;
@@ -51,24 +61,27 @@ type TopCompaniesResponse = {
 };
 
 const INDUSTRY_LABELS: Record<string, string> = {
-  TECH: 'Tech',
-  FINANCE: 'Finance',
-  RESEARCH: 'Research',
+  TECH: "Tech",
+  FINANCE: "Finance",
+  RESEARCH: "Research",
+  OTHER: "Other",
 };
 
 function TrendIcon({ trend }: { trend: Trend }) {
-  if (trend === 'up') {
+  if (trend === "up") {
     return <span className="text-green-600 text-sm">↑</span>;
   }
-  if (trend === 'down') {
+  if (trend === "down") {
     return <span className="text-red-600 text-sm">↓</span>;
   }
-  if (trend === 'same') {
+  if (trend === "same") {
     return <span className="text-gray-500 text-sm">→</span>;
   }
-  // 'new'
+  // "new"
   return <span className="text-blue-600 text-sm">•</span>;
 }
+
+type SortKey = "rank" | "country" | "score";
 
 export default function WorldStandingsPage() {
   const params = useParams<{ id: string }>();
@@ -78,13 +91,15 @@ export default function WorldStandingsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Top companies state (unchanged)
   const [topCompanies, setTopCompanies] =
     useState<TopCompaniesResponse | null>(null);
   const [topLoading, setTopLoading] = useState(true);
   const [topError, setTopError] = useState<string | null>(null);
 
-  // --------- LOAD STANDINGS (CountryYearPerformance-based) ---------
+  const [sortKey, setSortKey] = useState<SortKey>("rank");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+
+  // --------- LOAD STANDINGS ---------
   useEffect(() => {
     if (!id) return;
 
@@ -106,7 +121,7 @@ export default function WorldStandingsPage() {
         }
       } catch (e: any) {
         if (!cancelled) {
-          setError(e.message ?? 'Failed to load standings');
+          setError(e.message ?? "Failed to load standings");
         }
       } finally {
         if (!cancelled) {
@@ -121,7 +136,7 @@ export default function WorldStandingsPage() {
     };
   }, [id]);
 
-  // --------- LOAD TOP COMPANIES (unchanged) ---------
+  // --------- LOAD TOP COMPANIES ---------
   useEffect(() => {
     if (!id) return;
 
@@ -143,7 +158,7 @@ export default function WorldStandingsPage() {
         }
       } catch (e: any) {
         if (!cancelled) {
-          setTopError(e.message ?? 'Failed to load top companies');
+          setTopError(e.message ?? "Failed to load top companies");
         }
       } finally {
         if (!cancelled) {
@@ -158,26 +173,108 @@ export default function WorldStandingsPage() {
     };
   }, [id]);
 
-  // --------- EARLY RETURNS (NO HOOKS BELOW THIS LINE) ---------
+  // ---- derive lightweight values for hooks ----
+  const world = data?.world ?? null;
+  const standings = data?.standings ?? [];
+
+  const sortedStandings = useMemo(() => {
+    const rows = [...standings];
+
+    rows.sort((a, b) => {
+      let cmp = 0;
+
+      if (sortKey === "rank") {
+        cmp = a.currentRank - b.currentRank;
+      } else if (sortKey === "country") {
+        cmp = a.countryName.localeCompare(b.countryName);
+      } else if (sortKey === "score") {
+        cmp = a.totalScore - b.totalScore;
+      }
+
+      if (sortDir === "desc") {
+        cmp = -cmp;
+      }
+      return cmp;
+    });
+
+    // Ensure stable ordering when ties on the sort key
+    if (sortKey !== "rank") {
+      rows.sort((a, b) => {
+        if (sortKey === "country" && a.countryName === b.countryName) {
+          return a.currentRank - b.currentRank;
+        }
+        if (sortKey === "score" && a.totalScore === b.totalScore) {
+          return a.currentRank - b.currentRank;
+        }
+        return 0;
+      });
+    }
+
+    return rows;
+  }, [standings, sortKey, sortDir]);
+
+  const industryTotals = useMemo(() => {
+    if (!topCompanies || !topCompanies.companies.length) return [];
+    const map = new Map<
+      string,
+      { industry: string; totalOutput: number; count: number }
+    >();
+
+    for (const c of topCompanies.companies) {
+      const key = c.industry;
+      const existing =
+        map.get(key) ?? { industry: key, totalOutput: 0, count: 0 };
+      existing.totalOutput += c.outputScore;
+      existing.count += 1;
+      map.set(key, existing);
+    }
+
+    return Array.from(map.values()).sort(
+      (a, b) => b.totalOutput - a.totalOutput,
+    );
+  }, [topCompanies]);
+
+  const handleSort = (key: SortKey) => {
+    setSortKey((prevKey) => {
+      if (prevKey === key) {
+        setSortDir((prevDir) => (prevDir === "asc" ? "desc" : "asc"));
+        return prevKey;
+      }
+      setSortDir("desc"); // default high-first behaviour
+      return key;
+    });
+  };
+
+  const sortIndicator = (key: SortKey) => {
+    if (sortKey !== key) return null;
+    return (
+      <span className="ml-1 text-[10px]">
+        {sortDir === "asc" ? "▲" : "▼"}
+      </span>
+    );
+  };
+
+  // --------- EARLY RETURNS (after all hooks) ---------
   if (loading) {
-    return <main className="p-4">Loading league table…</main>;
+    return (
+      <main className="p-4">
+        <p className="text-sm text-gray-600">Loading league table…</p>
+      </main>
+    );
   }
 
   if (error || !data) {
     return (
       <main className="p-4 space-y-3">
-        <p className="text-red-600">
-          Failed to load standings
-          {error ? `: ${error}` : '.'}
+        <p className="text-red-600 text-sm">
+          Failed to load standings{error ? `: ${error}` : "."}
         </p>
-        <Link href="/" className="text-blue-600 underline">
+        <Link href="/" className="text-blue-600 underline text-sm">
           ← Back to world overview
         </Link>
       </main>
     );
   }
-
-  const { world, standings } = data;
 
   if (!world) {
     return (
@@ -185,191 +282,257 @@ export default function WorldStandingsPage() {
         <p className="text-sm text-gray-600">
           No world found in the database yet.
         </p>
-        <Link href="/" className="text-blue-600 underline">
+        <Link href="/" className="text-blue-600 underline text-sm">
           ← Back to world overview
         </Link>
       </main>
     );
   }
 
-  // Ensure standings are sorted by currentRank ascending
-  const sortedStandings = [...standings].sort(
-    (a, b) => a.currentRank - b.currentRank,
-  );
+  const playerCountryId = world.controlledCountryId;
 
   return (
-    <main className="p-4 space-y-8">
-      {/* Header */}
-      <header className="space-y-1">
-        <Link href="/" className="text-blue-600 underline">
-          ← Back to world overview
-        </Link>
-        <h1 className="text-2xl font-bold">Country Standings</h1>
-        <p className="text-sm text-gray-600">
-          World: {world.name} · Year {world.currentYear}
-        </p>
-        <p className="text-xs text-gray-500">
-          Countries are ranked by their <code>totalScore</code> from{' '}
-          <code>CountryYearPerformance</code> for the current season. Arrows
-          show movement compared to last year.
-        </p>
-      </header>
+    <main className="p-4 space-y-4 md:p-6">
+      <SectionHeader
+        title="Country Standings"
+        description={
+          <span className="text-sm text-gray-600">
+            World: <span className="font-semibold">{world.name}</span> · Year{" "}
+            {world.currentYear}
+          </span>
+        }
+        action={
+          <Link href="/" className="text-xs text-blue-600 hover:underline">
+            ← Back to world overview
+          </Link>
+        }
+      />
 
-      {/* League Table */}
-      {sortedStandings.length === 0 ? (
-        <section>
-          <p className="text-sm text-gray-600">
-            No league standings yet — simulate at least one year to generate
-            country performance.
-          </p>
-        </section>
-      ) : (
-        <section className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 text-sm">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                  Rank
-                </th>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                  Country
-                </th>
-                <th className="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                  Score
-                </th>
-                <th className="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                  Last Year
-                </th>
-                <th className="px-3 py-2 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                  Trend
-                </th>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                  Recent Seasons
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 bg-white">
-              {sortedStandings.map((row) => {
-                const historySorted = [...row.history].sort(
-                  (a, b) => a.year - b.year,
-                );
-
-                return (
-                  <tr
-                    key={row.countryId}
-                    className="hover:bg-gray-50 transition"
-                  >
-                    <td className="px-3 py-2 text-xs text-gray-500">
-                      {row.currentRank}
-                    </td>
-                    <td className="px-3 py-2">
-                      <Link
-                        href={`/country/${row.countryId}`}
-                        className="text-sm font-medium text-blue-700 hover:underline"
+      {/* Two-column layout: standings + top companies / industry totals */}
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,2.4fr)_minmax(260px,1.3fr)] lg:gap-6">
+        {/* LEFT: League Table */}
+        <section className="space-y-3">
+          <Panel id="standings">
+            <PanelHeader
+              title="League Table"
+              subtitle="Countries ranked by totalScore from CountryYearPerformance for the current season. Arrows show movement vs. last year."
+            />
+            {sortedStandings.length === 0 ? (
+              <PanelBody>
+                <p className="text-sm text-gray-600">
+                  No league standings yet — simulate at least one year to
+                  generate country performance.
+                </p>
+              </PanelBody>
+            ) : (
+              <PanelBody>
+                <Table dense>
+                  <TableHead>
+                    <tr>
+                      <Th
+                        onClick={() => handleSort("rank")}
+                        className="cursor-pointer select-none"
                       >
-                        {row.countryName}
-                      </Link>
-                    </td>
-                    <td className="px-3 py-2 text-right">
-                      {row.totalScore.toFixed(1)}
-                    </td>
-                    <td className="px-3 py-2 text-right text-xs text-gray-700">
-                      {row.lastYearRank != null ? row.lastYearRank : '–'}
-                    </td>
-                    <td className="px-3 py-2 text-center">
-                      <TrendIcon trend={row.trend} />
-                    </td>
-                    <td className="px-3 py-2 text-xs text-gray-600">
-                      {historySorted.length === 0 ? (
-                        <span>—</span>
-                      ) : (
-                        <span>
-                          {historySorted
-                            .map(
-                              (h) =>
-                                `${h.year}: ${h.totalScore.toFixed(1)}`,
-                            )
-                            .join(' · ')}
+                        Rank {sortIndicator("rank")}
+                      </Th>
+                      <Th
+                        onClick={() => handleSort("country")}
+                        className="cursor-pointer select-none"
+                      >
+                        Country {sortIndicator("country")}
+                      </Th>
+                      <Th
+                        align="right"
+                        onClick={() => handleSort("score")}
+                        className="cursor-pointer select-none"
+                      >
+                        Score {sortIndicator("score")}
+                      </Th>
+                      <Th align="right">Last Year</Th>
+                      <Th align="center">Trend</Th>
+                      <Th>Recent Seasons</Th>
+                    </tr>
+                  </TableHead>
+                  <TableBody>
+                    {sortedStandings.map((row) => {
+                      const historySorted = [...row.history].sort(
+                        (a, b) => a.year - b.year,
+                      );
+                      const isPlayer =
+                        playerCountryId != null &&
+                        row.countryId === playerCountryId;
+
+                      return (
+                        <TableRow
+                          key={row.countryId}
+                          highlight={isPlayer}
+                          className={isPlayer ? "bg-blue-50/80" : undefined}
+                        >
+                          <Td className="text-xs text-gray-500">
+                            {row.currentRank}
+                          </Td>
+                          <Td>
+                            <Link
+                              href={`/country/${row.countryId}`}
+                              className="text-sm font-medium text-blue-700 hover:underline"
+                            >
+                              {row.countryName}
+                            </Link>
+                            {isPlayer && (
+                              <span className="ml-1 rounded-full bg-blue-600 px-1.5 py-[1px] text-[10px] font-semibold text-white">
+                                You
+                              </span>
+                            )}
+                          </Td>
+                          <Td
+                            align="right"
+                            className="text-sm font-mono"
+                          >
+                            {row.totalScore.toFixed(1)}
+                          </Td>
+                          <Td
+                            align="right"
+                            className="text-xs text-gray-700 min-w-[40px]"
+                          >
+                            {row.lastYearRank != null
+                              ? row.lastYearRank
+                              : "–"}
+                          </Td>
+                          <Td align="center">
+                            <TrendIcon trend={row.trend} />
+                          </Td>
+                          <Td className="text-[11px] text-gray-600">
+                            {historySorted.length === 0 ? (
+                              <span>—</span>
+                            ) : (
+                              <span>
+                                {historySorted
+                                  .map(
+                                    (h) =>
+                                      `${h.year}: ${h.totalScore.toFixed(
+                                        1,
+                                      )}`,
+                                  )
+                                  .join(" · ")}
+                              </span>
+                            )}
+                          </Td>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </PanelBody>
+            )}
+          </Panel>
+        </section>
+
+        {/* RIGHT: Top Companies + Industry totals */}
+        <aside className="space-y-3">
+          <Panel id="top-companies">
+            <PanelHeader title="Top Companies" />
+            {topLoading ? (
+              <PanelBody>
+                <p className="text-sm text-gray-600">
+                  Loading top companies…
+                </p>
+              </PanelBody>
+            ) : topError ? (
+              <PanelBody>
+                <p className="text-sm text-red-600">
+                  Failed to load top companies: {topError}
+                </p>
+              </PanelBody>
+            ) : !topCompanies || !topCompanies.companies.length ? (
+              <PanelBody>
+                <p className="text-sm text-gray-600">
+                  No company performance data yet.
+                </p>
+              </PanelBody>
+            ) : (
+              <PanelBody>
+                <Table dense>
+                  <TableHead>
+                    <tr>
+                      <Th>Rank</Th>
+                      <Th>Company</Th>
+                      <Th>Country</Th>
+                      <Th>Ind.</Th>
+                      <Th align="right">Output</Th>
+                    </tr>
+                  </TableHead>
+                  <TableBody>
+                    {topCompanies.companies.map((c, idx) => (
+                      <TableRow key={c.companyId}>
+                        <Td className="text-xs text-gray-500">
+                          {idx + 1}
+                        </Td>
+                        <Td>
+                          <Link
+                            href={`/company/${c.companyId}`}
+                            className="text-xs text-blue-700 hover:underline"
+                          >
+                            {c.name}
+                          </Link>
+                        </Td>
+                        <Td className="text-xs">
+                          <Link
+                            href={`/country/${c.countryId}`}
+                            className="text-blue-600 hover:underline"
+                          >
+                            {c.countryName}
+                          </Link>
+                        </Td>
+                        <Td className="text-xs text-gray-700">
+                          {INDUSTRY_LABELS[c.industry] ?? c.industry}
+                        </Td>
+                        <Td
+                          align="right"
+                          className="font-mono text-xs"
+                        >
+                          {c.outputScore.toFixed(1)}
+                        </Td>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </PanelBody>
+            )}
+          </Panel>
+
+          <Panel>
+            <PanelHeader title="Per-Industry Totals (Top Companies)" />
+            <PanelBody>
+              {!industryTotals.length ? (
+                <p className="text-sm text-gray-600">
+                  Industry breakdown will appear once company performance
+                  data is available.
+                </p>
+              ) : (
+                <ul className="space-y-1 text-xs text-gray-700">
+                  {industryTotals.map((row) => (
+                    <li
+                      key={row.industry}
+                      className="flex items-center justify-between"
+                    >
+                      <span className="font-medium">
+                        {INDUSTRY_LABELS[row.industry] ?? row.industry}
+                      </span>
+                      <span className="font-mono">
+                        {row.totalOutput.toFixed(1)}{" "}
+                        <span className="text-[10px] text-gray-500">
+                          ({row.count}{" "}
+                          {row.count === 1 ? "company" : "companies"})
                         </span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </section>
-      )}
-
-      {/* Top companies (unchanged) */}
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Top Companies</h2>
-        {topLoading ? (
-          <p className="text-sm text-gray-600">
-            Loading top companies…
-          </p>
-        ) : topError ? (
-          <p className="text-sm text-red-600">
-            Failed to load top companies: {topError}
-          </p>
-        ) : !topCompanies || !topCompanies.companies.length ? (
-          <p className="text-sm text-gray-600">
-            No company performance data yet.
-          </p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-xs border border-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-2 py-1 text-left border-b">Rank</th>
-                  <th className="px-2 py-1 text-left border-b">Company</th>
-                  <th className="px-2 py-1 text-left border-b">Country</th>
-                  <th className="px-2 py-1 text-left border-b">
-                    Industry
-                  </th>
-                  <th className="px-2 py-1 text-right border-b">
-                    Output
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {topCompanies.companies.map((c, idx) => (
-                  <tr
-                    key={c.companyId}
-                    className="odd:bg-white even:bg-gray-50"
-                  >
-                    <td className="px-2 py-1 border-b align-middle">
-                      {idx + 1}
-                    </td>
-                    <td className="px-2 py-1 border-b align-middle">
-                      <Link
-                        href={`/company/${c.companyId}`}
-                        className="text-blue-600 hover:underline"
-                      >
-                        {c.name}
-                      </Link>
-                    </td>
-                    <td className="px-2 py-1 border-b align-middle">
-                      <Link
-                        href={`/country/${c.countryId}`}
-                        className="text-blue-600 hover:underline"
-                      >
-                        {c.countryName}
-                      </Link>
-                    </td>
-                    <td className="px-2 py-1 border-b align-middle">
-                      {INDUSTRY_LABELS[c.industry] ?? c.industry}
-                    </td>
-                    <td className="px-2 py-1 border-b text-right align-middle">
-                      {c.outputScore.toFixed(1)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </PanelBody>
+          </Panel>
+        </aside>
+      </div>
     </main>
   );
 }
